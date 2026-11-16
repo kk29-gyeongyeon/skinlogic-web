@@ -1,0 +1,3676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SkinLogic - AI 맞춤 스킨케어 & 성분 분석</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
+  <style>
+    html, body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+      overflow-x: hidden;
+      width: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary {
+      background-color: #0d9488;
+    }
+    .btn-primary:hover {
+      background-color: #0f766e;
+    }
+    .btn-primary:active {
+      background-color: #115e59;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .safe-bottom-nav {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (max-width: 640px) {
+      input[type="text"],
+      input[type="password"],
+      textarea,
+      select {
+        font-size: 14px !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 md:pb-6">
+
+  <!-- ==================== 상단 헤더 (PC 1줄 메뉴 & 모바일 간소화 헤더) ==================== -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3.5 sm:px-6 h-14 md:h-16 flex items-center justify-between gap-2">
+      <!-- 로고 (홈 이동) -->
+      <div onclick="switchTab('home')" class="flex items-center gap-2 cursor-pointer shrink-0 py-1">
+        <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
+          SL
+        </div>
+        <div>
+          <span class="font-extrabold text-base md:text-lg tracking-tight text-slate-900 block leading-none">SkinLogic</span>
+          <span class="text-[10px] text-slate-400 font-semibold hidden sm:block mt-0.5">AI Skincare & Inner Beauty</span>
+        </div>
+      </div>
+
+      <!-- PC 전용 1줄 핵심 메뉴 (모바일에서는 하단 고정 탭 바로 분리) -->
+      <nav class="hidden md:flex items-center gap-1 lg:gap-1.5 shrink-0">
+        <button id="tab-btn-home" onclick="switchTab('home')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-bold bg-teal-50 text-teal-700 transition whitespace-nowrap">
+          홈 대시보드
+        </button>
+        <button id="tab-btn-scan" onclick="switchTab('scan')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          라벨 스캔 <span id="scan-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        </button>
+        <button id="tab-btn-vanity" onclick="switchTab('vanity')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          내 화장대 <span id="vanity-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        </button>
+        <button id="tab-btn-ai" onclick="switchTab('ai')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          AI 루틴 · 이너뷰티 <span id="inner-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        </button>
+        <button id="tab-btn-archive" onclick="switchTab('archive')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          리포트 보관함 <span id="archive-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        </button>
+      </nav>
+
+      <!-- 우측 로그인 / 프로필 영역 -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div id="header-auth-guest" class="flex items-center gap-1.5">
+          <button onclick="openAuthModal('LOGIN')" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition shadow-xs">
+            로그인
+          </button>
+          <button onclick="openAuthModal('SIGNUP')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+            회원가입
+          </button>
+        </div>
+
+        <div id="header-auth-user" class="hidden items-center gap-1.5 sm:gap-2">
+          <img id="header-user-avatar" src="" alt="프로필" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-teal-300 hidden shrink-0" />
+          <div id="header-user-avatar-fallback" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+            U
+          </div>
+          <span id="header-user-nickname" class="text-xs font-bold text-slate-800 max-w-[80px] sm:max-w-[120px] truncate">회원님</span>
+          <button onclick="openAccountModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            계정관리
+          </button>
+          <button onclick="handleLogout()" class="px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-50 text-xs font-semibold">
+            로그아웃
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== 전역 상태 알림 토스트 배너 ==================== -->
+  <div id="global-toast-banner" class="hidden max-w-7xl w-full mx-auto px-3.5 sm:px-6 pt-3">
+    <div id="global-toast-inner" class="p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
+      <span id="global-toast-text"></span>
+      <button onclick="hideGlobalToast()" class="px-1.5 py-0.5 opacity-70 hover:opacity-100 font-bold">✕</button>
+    </div>
+  </div>
+
+  <!-- ==================== 모바일 전용 하단 고정 탭 네비게이션 ==================== -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom-nav shadow-lg">
+    <div class="grid grid-cols-5 h-16">
+      <button id="mob-tab-btn-home" onclick="switchTab('home')" class="flex flex-col items-center justify-center gap-0.5 text-teal-600 font-bold">
+        <span class="text-base leading-none">🏠</span>
+        <span class="text-[11px]">홈</span>
+      </button>
+      <button id="mob-tab-btn-scan" onclick="switchTab('scan')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+        <span class="text-base leading-none">📷</span>
+        <span class="text-[11px]">라벨스캔</span>
+        <span id="mob-scan-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+      </button>
+      <button id="mob-tab-btn-vanity" onclick="switchTab('vanity')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+        <span class="text-base leading-none">🧴</span>
+        <span class="text-[11px]">내화장대</span>
+        <span id="mob-vanity-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+      </button>
+      <button id="mob-tab-btn-ai" onclick="switchTab('ai')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+        <span class="text-base leading-none">✨</span>
+        <span class="text-[11px]">AI·영양</span>
+        <span id="mob-inner-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+      </button>
+      <button id="mob-tab-btn-archive" onclick="switchTab('archive')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+        <span class="text-base leading-none">🗂️</span>
+        <span class="text-[11px]">보관함</span>
+        <span id="mob-archive-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== 메인 컨테이너 ==================== -->
+  <main class="max-w-7xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 flex-1">
+
+    <!-- =================================================================== -->
+    <!-- [MENU 1: 홈] PC 와이드 대시보드 & 정밀 날씨·UV 카드                   -->
+    <!-- =================================================================== -->
+    <div id="tab-content-home" class="space-y-4 sm:space-y-5">
+
+      <!-- 정밀 날씨 · UV · 추천 근거 카드 -->
+      <div id="env-weather-card" class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3.5">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 min-w-0">
+            <span class="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 font-extrabold text-xs sm:text-sm" id="env-card-region">경기도 수원시</span>
+            <span class="text-slate-800 font-bold text-xs sm:text-sm" id="env-card-weather">기상 조회 중...</span>
+            <span id="env-source-badge" class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">데이터 확인 중</span>
+            <span class="text-[11px] text-slate-400" id="env-updated-time"></span>
+          </div>
+
+          <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
+            <button onclick="fetchRealtimeWeather(currentRegionKey)" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
+              🔄 갱신
+            </button>
+            <button onclick="requestUserGpsWeather()" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
+              📍 내 위치
+            </button>
+            <select id="env-region-select" onchange="onRegionSelectChange(this.value)" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-500">
+              <option value="수원">수원</option>
+              <option value="서울">서울</option>
+              <option value="인천">인천</option>
+              <option value="대전">대전</option>
+              <option value="대구">대구</option>
+              <option value="광주">광주</option>
+              <option value="부산">부산</option>
+              <option value="제주">제주</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <span class="text-[11px] text-slate-500 font-semibold">현재 기온</span>
+            <div class="text-base sm:text-lg font-black text-slate-900 mt-1" id="env-card-temp">-</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-sky-50/60 border border-sky-200/80 flex flex-col justify-between">
+            <span class="text-[11px] text-sky-800 font-semibold">현재 습도</span>
+            <div class="text-base sm:text-lg font-black text-sky-900 mt-1" id="env-card-humidity">-</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-amber-50/60 border border-amber-200/80 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-[11px] text-amber-900 font-semibold">실시간 UV</span>
+              <span id="env-uv-level-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+            </div>
+            <div class="text-base sm:text-lg font-black text-slate-900 mt-1" id="env-card-uv">-</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-orange-50/60 border border-orange-200/80 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-[11px] text-orange-900 font-semibold">오늘 최고 UV</span>
+              <span id="env-uv-max-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-1 mt-1">
+              <span class="text-base sm:text-lg font-black text-slate-900" id="env-card-uv-max">-</span>
+              <span class="text-[10px] text-slate-500 font-semibold" id="env-card-uv-tomorrow"></span>
+            </div>
+          </div>
+
+          <div class="col-span-2 sm:col-span-1 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-[11px] text-slate-500 font-semibold">초미세먼지</span>
+              <span id="env-pm25-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+            </div>
+            <div class="text-base sm:text-lg font-black text-slate-900 mt-1" id="env-card-pm25">-</div>
+          </div>
+        </div>
+
+        <div id="env-status-notice-box" class="hidden p-3 rounded-xl text-xs leading-relaxed"></div>
+
+        <div id="env-rationale-container" class="p-3 rounded-xl bg-teal-50/50 border border-teal-200/80 space-y-2 text-xs">
+          <div class="flex items-start sm:items-center justify-between gap-2">
+            <div class="text-slate-800 leading-relaxed font-medium" id="env-primary-tip-text">
+              실시간 기상·UV 데이터를 불러오는 중입니다...
+            </div>
+            <button type="button" onclick="togglePairDetail('env-rationale-detail-list')" class="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-teal-700 text-[11px] font-bold hover:bg-teal-50">
+              추천 근거 ▾
+            </button>
+          </div>
+          <div id="env-rationale-detail-list" class="hidden pt-2 border-t border-teal-200/70 space-y-1.5 text-xs"></div>
+        </div>
+      </div>
+
+      <!-- 핵심 4대 요약 카드 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div class="text-xs font-bold text-slate-400 mb-1">내 화장대</div>
+            <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-vanity-count">0종 등록됨</div>
+            <p class="text-xs text-slate-500 mt-1.5 line-clamp-2" id="dash-vanity-desc">등록된 화장품이 없습니다.</p>
+          </div>
+          <button onclick="switchTab('vanity')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+            화장대 관리 →
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div class="text-xs font-bold text-slate-400 mb-1">성분 상극 현황</div>
+            <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-conflict-title">주의 조합 0건</div>
+            <p class="text-xs text-slate-500 mt-1.5" id="dash-conflict-desc">제품 2종 이상 등록 시 자동 분석됩니다.</p>
+          </div>
+          <button onclick="switchTab('scan')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+            라벨 스캔 · 상극 확인 →
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div class="text-xs font-bold text-slate-400 mb-1">피부 유형 · 고민</div>
+            <div class="text-xl sm:text-2xl font-black text-teal-700" id="dash-skin-concern">미설정</div>
+            <p class="text-xs text-slate-500 mt-1.5" id="dash-skin-style">피부 유형과 고민을 선택해 주세요.</p>
+          </div>
+          <button onclick="switchTab('ai')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+            유형 · 영양제 설정 →
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div class="text-xs font-bold text-slate-400 mb-1">AI 루틴 적합도</div>
+            <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-ai-score">분석 전</div>
+            <p class="text-xs text-slate-500 mt-1.5" id="dash-ai-desc">AI 맞춤 루틴 추천을 실행해 보세요.</p>
+          </div>
+          <button onclick="switchTab('ai')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl btn-primary text-white text-xs font-bold transition shadow-xs">
+            AI 루틴 추천 이동 →
+          </button>
+        </div>
+      </div>
+
+      <!-- 오늘의 아침(AM) / 저녁(PM) 루틴 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-extrabold text-slate-900">☀️ 오늘의 아침(AM) 루틴</h3>
+            <button onclick="switchTab('ai')" class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집 →</button>
+          </div>
+          <div id="dash-am-routine-list" class="space-y-2 text-xs"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-extrabold text-slate-900">🌙 오늘의 저녁(PM) 루틴</h3>
+            <button onclick="switchTab('ai')" class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집 →</button>
+          </div>
+          <div id="dash-pm-routine-list" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
+
+      <!-- 최근 리포트 요약 -->
+      <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-extrabold text-slate-900">🗂️ 최근 분석 리포트</h3>
+          <button onclick="switchTab('archive')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-600 font-bold hover:bg-slate-200">전체 보관함 →</button>
+        </div>
+        <div id="dash-recent-reports-box" class="text-xs"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- [MENU 2: 라벨 스캔] 카메라 · OCR 자동 인식 · 다중 검색 리스트(교체/추가) -->
+    <!-- =================================================================== -->
+    <div id="tab-content-scan" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4 shadow-2xs">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="font-extrabold text-sm sm:text-base text-slate-900">화장품 라벨 스캔 및 분석 목록</h2>
+            <span id="replace-mode-indicator" class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
+              교체 모드 <button onclick="cancelReplaceMode()" class="ml-1 underline">취소</button>
+            </span>
+          </div>
+
+          <!-- 1. 라벨 사진 촬영 & OCR 자동 인식 및 사용자 확인/수정 폼 -->
+          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-800">1. 사진 촬영 · OCR 자동 인식 및 등록</span>
+              <span id="camera-facing-badge" class="px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold">후면 카메라 우선</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button type="button" onclick="startWebCamera()" class="min-h-[46px] py-3 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition">
+                <span>📸 카메라로 직접 촬영</span>
+              </button>
+
+              <label for="ocr-file-input" class="min-h-[46px] py-3 px-3.5 rounded-xl bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                <span>🖼️ 갤러리 사진 선택</span>
+              </label>
+            </div>
+
+            <input id="ocr-file-input" type="file" accept="image/*" class="hidden" onchange="handleOcrFileSelect(event)" />
+            <input id="ocr-native-camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleOcrFileSelect(event)" />
+            <canvas id="camera-capture-canvas" class="hidden"></canvas>
+
+            <!-- [A] 웹 화면 내 실시간 카메라 미리보기 뷰포트 -->
+            <div id="camera-live-container" class="hidden rounded-2xl overflow-hidden border-2 border-teal-500 bg-slate-950 shadow-md">
+              <div class="relative w-full h-64 sm:h-72 bg-black flex items-center justify-center">
+                <video id="camera-video-el" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                <div class="pointer-events-none absolute inset-4 border-2 border-dashed border-teal-300/80 rounded-xl flex flex-col justify-between p-2.5">
+                  <div class="flex items-center justify-between text-[11px] font-bold text-white bg-slate-900/60 px-2.5 py-1 rounded-lg backdrop-blur-xs">
+                    <span id="camera-stream-label">📷 후면 카메라 작동 중</span>
+                    <span class="text-teal-300">제품명/전성분을 사각형 안에 맞춰주세요</span>
+                  </div>
+                  <div class="text-center text-[11px] text-white/90 bg-slate-900/50 py-1 rounded-lg">
+                    촬영 즉시 브랜드·제품명·전성분·제형이 자동 추출됩니다
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3 bg-slate-900 flex items-center justify-between gap-2">
+                <button type="button" onclick="switchCameraFacingMode()" class="min-h-[40px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
+                  🔄 전/후면 전환
+                </button>
+                <button type="button" onclick="capturePhotoFromVideo()" class="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs sm:text-sm shadow-md transition">
+                  📸 사진 찍기 (자동 인식)
+                </button>
+                <button type="button" onclick="stopWebCamera()" class="min-h-[40px] px-3 py-2 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold transition">
+                  ✕ 닫기
+                </button>
+              </div>
+            </div>
+
+            <!-- [B] 카메라 권한 거부 또는 사용 불가 환경 안내 및 폴백 박스 -->
+            <div id="camera-error-box" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2.5 text-xs">
+              <div class="font-extrabold text-amber-900 flex items-center justify-between">
+                <span id="camera-error-title">⚠️ 웹 카메라 미리보기를 실행할 수 없습니다</span>
+                <button type="button" onclick="hideCameraErrorBox()" class="text-amber-700 font-bold px-1">✕</button>
+              </div>
+              <p id="camera-error-msg" class="text-amber-800 leading-relaxed text-[11px]"></p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <label for="ocr-native-camera-input" class="min-h-[40px] py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
+                  📱 기기 기본 카메라 앱으로 촬영
+                </label>
+                <label for="ocr-file-input" class="min-h-[40px] py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-amber-300 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
+                  🖼️ 갤러리에서 사진 선택
+                </label>
+              </div>
+            </div>
+
+            <!-- [C] 촬영 / 선택된 사진 미리보기 박스 -->
+            <div id="ocr-photo-preview-box" class="hidden p-3 rounded-xl bg-white border border-teal-400 space-y-2.5 shadow-2xs">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-extrabold text-teal-800" id="ocr-preview-source-badge">📸 촬영된 사진 미리보기</span>
+                <span class="text-[11px] text-slate-400 truncate max-w-[150px]" id="ocr-preview-filename"></span>
+              </div>
+
+              <div class="relative rounded-xl overflow-hidden bg-slate-900 max-h-48 flex items-center justify-center border border-slate-200">
+                <img id="ocr-photo-preview-img" src="" alt="촬영 사진 미리보기" class="max-h-44 w-auto object-contain mx-auto" />
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" onclick="retakeWebCameraPhoto()" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
+                  📸 다시 촬영
+                </button>
+                <label for="ocr-file-input" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer">
+                  🖼️ 다른 사진
+                </label>
+                <button type="button" onclick="clearOcrPhotoPreview()" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs">
+                  ✕ 사진 지우기
+                </button>
+              </div>
+            </div>
+
+            <!-- [D] OCR 자동 인식 결과 확인 · 수정 및 수동 등록 통합 폼 -->
+            <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-1.5">
+                <span class="text-xs font-extrabold text-slate-800">인식 결과 확인 · 수정 (또는 직접 수동 입력)</span>
+                <span id="ocr-recognition-mode-badge" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
+                  사진 대기 / 수동 입력 가능
+                </span>
+              </div>
+
+              <div id="ocr-match-banner" class="hidden p-2.5 rounded-lg text-xs leading-relaxed"></div>
+              <input id="ocr-matched-product-id" type="hidden" value="0" />
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">브랜드명</label>
+                  <input id="ocr-brand-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 라운드랩, 토리든" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">제품명</label>
+                  <input id="ocr-name-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 자작나무 수분 선크림" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex-1">
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">제품 제형</label>
+                  <select id="ocr-type-select" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium focus:outline-none focus:border-teal-500">
+                    <option value="AUTO">제형 자동 판별</option>
+                    <option value="스킨/토너">스킨/토너</option>
+                    <option value="토너패드">토너패드</option>
+                    <option value="에센스/세럼/앰플">에센스/세럼/앰플</option>
+                    <option value="로션/에멀젼">로션/에멀젼</option>
+                    <option value="크림/밤">크림/밤</option>
+                    <option value="클렌징 폼/젤">클렌징 폼/젤</option>
+                    <option value="클렌징 오일">클렌징 오일/밤</option>
+                    <option value="선크림/로션">선크림/로션</option>
+                    <option value="선세럼/선젤/플루이드">선세럼/선젤</option>
+                    <option value="시트마스크">시트마스크/팩</option>
+                  </select>
+                </div>
+
+                <label class="flex items-center gap-2 cursor-pointer select-none shrink-0 sm:mt-5 py-1">
+                  <input id="ocr-auto-vanity-check" type="checkbox" checked class="w-4 h-4 accent-teal-600 rounded" />
+                  <span class="text-xs font-bold text-teal-800">내 화장대 동시 등록 (중복 방지)</span>
+                </label>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-[11px] font-bold text-slate-600">추출된 전성분 (직접 확인 · 수정 가능)</label>
+                  <button type="button" onclick="resetOcrFormFields()" class="text-[11px] text-slate-400 hover:text-slate-600 underline">입력 초기화</button>
+                </div>
+                <textarea id="ocr-ingredients-input" rows="2" placeholder="사진 촬영 시 전성분이 자동 입력되며, 직접 수정하거나 수동으로 입력(쉼표 구분)할 수 있습니다." class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 leading-relaxed custom-scroll"></textarea>
+              </div>
+
+              <button type="button" id="btn-confirm-ocr-save" onclick="confirmAndSaveOcrProduct()" class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs sm:text-sm shadow-xs transition">
+                ✓ 확인 완료 · 분석 목록 및 DB 등록
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-500 px-1">
+              <span id="ocr-status-badge">사진을 촬영/선택하면 브랜드·제품명·전성분·제형이 자동 추출됩니다.</span>
+            </div>
+            <div id="ocr-db-result-box" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs break-words"></div>
+          </div>
+
+          <!-- 2. DB 화장품 검색 (다중 결과 리스트 및 동일 제형 [교체] / [+ 추가] 동시 제공) -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800">2. DB 화장품 검색 · 다중 추가 및 교체</span>
+              <span class="text-[11px] text-slate-400" id="scan-search-count-label">검색 결과 표시</span>
+            </div>
+            <div class="flex gap-1.5">
+              <input id="scan-cosmetic-input" type="text" oninput="searchCosmeticForScan(this.value)" placeholder="🔍 브랜드, 제품명, 성분 검색 (예: 레티놀, 비타민C, 토리든)..." class="flex-1 min-h-[42px] sm:min-h-0 px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="searchCosmeticForScan(document.getElementById('scan-cosmetic-input').value)" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0">
+                검색
+              </button>
+            </div>
+            <div id="scan-cosmetic-results-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-60 overflow-y-auto p-2 custom-scroll border border-slate-200/80 rounded-xl bg-slate-50/60"></div>
+          </div>
+
+          <!-- 선택된 제품 목록 -->
+          <div class="pt-3 border-t border-slate-100">
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-xs font-bold text-slate-800">선택된 분석 목록 (<span id="scan-list-count" class="text-teal-600">0</span>개)</span>
+              <button onclick="clearScanProductList()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
+            </div>
+            <div id="scan-selected-products-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-72 overflow-y-auto custom-scroll pr-0.5"></div>
+          </div>
+
+          <button onclick="runTab1MultiAnalysis()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+            선택 제품 교차 상극 분석 실행
+          </button>
+        </div>
+      </div>
+
+      <!-- 우측 분석 결과 패널 -->
+      <div class="lg:col-span-7">
+        <div id="scan-result-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- [MENU 3: 내 화장대] 더미 제거 · 동일 제형 교체/추가 · 빈 화장대 안내   -->
+    <!-- =================================================================== -->
+    <div id="tab-content-vanity" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4 shadow-2xs">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="font-extrabold text-sm sm:text-base text-slate-900">내 화장대 제품 등록 및 관리</h2>
+            <span id="vanity-replace-indicator" class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
+              교체 대상 선택됨 <button onclick="cancelVanityReplaceMode()" class="ml-1 underline">취소</button>
+            </span>
+          </div>
+
+          <div class="flex flex-wrap gap-1.5">
+            <button onclick="filterCosmeticCategory('')" id="cat-btn-all" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 text-white transition">전체</button>
+            <button onclick="filterCosmeticCategory('Skincare')" id="cat-btn-Skincare" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">스킨케어</button>
+            <button onclick="filterCosmeticCategory('Cleansing')" id="cat-btn-Cleansing" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">클렌징</button>
+            <button onclick="filterCosmeticCategory('MaskPack')" id="cat-btn-MaskPack" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">마스크팩</button>
+            <button onclick="filterCosmeticCategory('SunCare')" id="cat-btn-SunCare" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">선케어</button>
+          </div>
+
+          <input id="routine-cosmetic-search" type="text" oninput="loadCosmeticList()" placeholder="🔍 브랜드, 제품명, 성분 검색..." class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+
+          <div>
+            <div class="text-[11px] font-semibold text-slate-400 mb-1.5">DB 화장품 목록 (동일 제형 보유 시 [교체] · [+ 추가] 지원)</div>
+            <div id="routine-cosmetic-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-2 custom-scroll border border-slate-100 rounded-xl bg-slate-50/60"></div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100">
+            <div class="flex items-center justify-between text-xs mb-2.5">
+              <span class="font-bold text-slate-800">보유 화장품 목록 (클릭 시 조합 필터)</span>
+              <button onclick="clearVanityBasket()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
+            </div>
+            <div id="vanity-basket-chips" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-60 overflow-y-auto custom-scroll pr-0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7">
+        <div id="vanity-auto-conflict-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- [MENU 4: AI 루틴 · 이너뷰티] 복수 추천(3~4개) · 영양제 1~4개 선택       -->
+    <!-- =================================================================== -->
+    <div id="tab-content-ai" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div class="lg:col-span-5 space-y-4">
+
+        <!-- 1. 피부 유형 · 고민 · 케어 단계 · 생활패턴 -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4 shadow-2xs">
+          <h2 class="font-extrabold text-sm sm:text-base text-slate-900">1. 피부 유형 · 고민 · 생활패턴 설정</h2>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-2">내 피부 유형 (6대 유형)</label>
+            <div class="grid grid-cols-3 gap-2" id="skin-type-btn-group">
+              <button type="button" onclick="selectSkinType('수부지')" data-stype="수부지" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-bold transition bg-teal-600 text-white border-teal-700 shadow-2xs">
+                수부지
+              </button>
+              <button type="button" onclick="selectSkinType('건성')" data-stype="건성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+                건성
+              </button>
+              <button type="button" onclick="selectSkinType('지성')" data-stype="지성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+                지성
+              </button>
+              <button type="button" onclick="selectSkinType('복합성')" data-stype="복합성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+                복합성
+              </button>
+              <button type="button" onclick="selectSkinType('민감성')" data-stype="민감성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+                민감성
+              </button>
+              <button type="button" onclick="selectSkinType('여드름성')" data-stype="여드름성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+                여드름성
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">피부 고민</label>
+              <select id="routine-concern-select" onchange="onRoutinePrefChange()" class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
+                <option value="수분/속건조">수분/속건조</option>
+                <option value="미백/잡티">미백/잡티</option>
+                <option value="트러블/피지">트러블/피지</option>
+                <option value="모공/각질">모공/각질</option>
+                <option value="탄력/주름">탄력/주름</option>
+                <option value="홍조/열감">홍조/열감</option>
+                <option value="장벽/민감진정">장벽/민감진정</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">선호 케어 단계</label>
+              <select id="routine-style-select" onchange="onRoutinePrefChange()" class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
+                <option value="1">1단계: 올인원 미니멀</option>
+                <option value="2">2단계: 실속 에센셜</option>
+                <option value="3" selected>3~4단계: 밸런스 정석</option>
+                <option value="4">4단계: 집중 레이어링</option>
+                <option value="5">5단계+: 나이트 풀케어</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">메이크업</label>
+              <select id="life-makeup" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+                <option value="0">안 함</option>
+                <option value="1" selected>선크림만</option>
+                <option value="2">풀메이크업</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">수면 시간</label>
+              <select id="life-sleep" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+                <option value="0">6시간 미만</option>
+                <option value="1" selected>6~7시간</option>
+                <option value="2">7시간 이상</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">야외 활동</label>
+              <select id="life-outdoor" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+                <option value="0">실내 위주</option>
+                <option value="1" selected>일반 출퇴근</option>
+                <option value="2">야외 많음</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">음주 빈도</label>
+              <select id="life-alcohol" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+                <option value="0" selected>안 함</option>
+                <option value="1">주 1~2회</option>
+                <option value="2">주 3회 이상</option>
+              </select>
+            </div>
+            <div class="col-span-2 sm:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">운동 빈도</label>
+              <select id="life-workout" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+                <option value="0">거의 안 함</option>
+                <option value="1" selected>주 1~2회 가벼운 운동</option>
+                <option value="2">고강도 운동 (땀 배출 많음)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 복용 중인 영양제 등록 & 희망 추천 개수(1~4개) 선택 -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3.5 shadow-2xs">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="font-extrabold text-sm sm:text-base text-slate-900">2. 이너뷰티 영양제 설정</h2>
+            <button onclick="clearSupplements()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">복용 목록 비우기</button>
+          </div>
+
+          <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between gap-2">
+            <div>
+              <div class="text-xs font-bold text-emerald-950">AI 신규 영양제 추천 개수</div>
+              <div class="text-[11px] text-emerald-700">우선순위 상위 영양소를 중복 없이 추천</div>
+            </div>
+            <select id="supplement-limit-select" onchange="onRoutinePrefChange()" class="min-h-[38px] px-3 py-1.5 text-xs rounded-xl border border-emerald-300 bg-white font-bold text-emerald-900 focus:outline-none focus:border-teal-600 shrink-0">
+              <option value="1">1개 추천</option>
+              <option value="2">2개 추천</option>
+              <option value="3" selected>3개 추천</option>
+              <option value="4">4개 추천</option>
+            </select>
+          </div>
+
+          <div class="relative">
+            <input id="supp-search-input" type="text" oninput="handleSupplementSearch(this.value)" placeholder="🔍 현재 복용 중인 영양제 검색 (예: 비타민, 칼슘, 마그네슘)..." class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+            <div id="supp-search-dropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-20 custom-scroll"></div>
+          </div>
+
+          <div id="selected-supp-chips" class="flex flex-wrap gap-2 min-h-[32px]"></div>
+        </div>
+
+        <button id="btn-run-ai-routine" onclick="runTab2AiRoutine()" class="w-full min-h-[48px] py-3.5 rounded-2xl btn-primary text-white font-bold text-sm shadow-sm transition">
+          AI 맞춤 루틴 & 이너뷰티 추천 실행
+        </button>
+      </div>
+
+      <!-- 우측 통합 결과 패널 -->
+      <div class="lg:col-span-7">
+        <div id="routine-result-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] flex flex-col items-center justify-center text-center shadow-2xs"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- [MENU 5: 리포트 보관함] 10개 단위 페이지네이션 · 상세 확인 · 개별 삭제  -->
+    <!-- =================================================================== -->
+    <div id="tab-content-archive" class="hidden">
+      <div class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 space-y-4 shadow-2xs">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold text-slate-900">저장된 분석 리포트 보관함</h2>
+            <p class="text-[11px] text-slate-400 mt-0.5" id="archive-page-status-text">총 0건의 분석 리포트</p>
+          </div>
+          <button onclick="clearArchive()" class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold hover:bg-rose-50">
+            전체 비우기
+          </button>
+        </div>
+        <div id="archive-comparison-box"></div>
+        <div id="archive-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        <div id="archive-pagination-bar" class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-1.5"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- [MODAL 1] 로그인 / 회원가입 / ID·PW 찾기 모달 (PC·모바일 완벽 중앙 정렬) -->
+  <!-- ===================================================================== -->
+  <div id="auth-modal-backdrop" onclick="if(event.target===this) closeAuthModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center p-3.5 sm:p-6">
+      <div class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 id="auth-modal-title" class="text-base sm:text-lg font-extrabold text-slate-900">로그인</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">회원별 화장대·영양제·루틴 데이터가 계정에 안전하게 분리 저장됩니다.</p>
+          </div>
+          <button onclick="closeAuthModal()" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold shrink-0">✕</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button id="auth-tab-login" onclick="switchAuthMode('LOGIN')" class="py-2 rounded-lg bg-white text-teal-700 shadow-2xs transition">로그인</button>
+          <button id="auth-tab-signup" onclick="switchAuthMode('SIGNUP')" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">회원가입</button>
+          <button id="auth-tab-find" onclick="switchAuthMode('FIND')" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">ID/PW 찾기</button>
+        </div>
+
+        <div id="auth-alert-box" class="hidden p-3 rounded-xl text-xs font-bold break-words leading-relaxed"></div>
+
+        <!-- 로그인 뷰 -->
+        <div id="auth-view-login" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
+            <input id="login-username" type="text" autocomplete="username" placeholder="아이디 입력" class="w-full min-h-[44px] px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
+            <div class="relative">
+              <input id="login-password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitLogin()" placeholder="비밀번호 입력" class="w-full min-h-[44px] px-3.5 py-2.5 pr-14 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-bold text-slate-500 hover:text-slate-800">
+                표시
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-0.5">
+            <label class="flex items-center gap-2 cursor-pointer select-none py-1">
+              <input id="login-remember-check" type="checkbox" checked class="w-4 h-4 accent-teal-600 rounded" />
+              <span class="font-medium text-slate-700">로그인 상태 유지</span>
+            </label>
+            <button type="button" onclick="switchAuthMode('FIND')" class="text-teal-600 font-bold hover:underline text-xs py-1">
+              아이디·비밀번호 찾기
+            </button>
+          </div>
+
+          <button id="btn-submit-login" onclick="submitLogin()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+            로그인 및 내 데이터 불러오기
+          </button>
+        </div>
+
+        <!-- 회원가입 뷰 -->
+        <div id="auth-view-signup" class="hidden space-y-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input id="signup-username" type="text" autocomplete="username" oninput="onSignupUsernameInput()" placeholder="영문/숫자 3자 이상" class="flex-1 min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="checkUsernameDuplicate()" class="min-h-[44px] px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold shrink-0 transition">
+                중복 확인
+              </button>
+            </div>
+            <p id="signup-id-check-msg" class="text-[11px] text-slate-400 mt-1">아이디 입력 후 [중복 확인]을 진행해 주세요.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
+              <div class="relative">
+                <input id="signup-password" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()" placeholder="4자 이상" class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                <button type="button" onclick="togglePasswordVisibility('signup-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호 확인</label>
+              <div class="relative">
+                <input id="signup-password-confirm" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()" placeholder="비밀번호 재입력" class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                <button type="button" onclick="togglePasswordVisibility('signup-password-confirm', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
+              </div>
+            </div>
+          </div>
+          <p id="signup-pw-match-msg" class="text-[11px] text-slate-400 -mt-1"></p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">닉네임</label>
+              <input id="signup-nickname" type="text" placeholder="표시될 닉네임 입력" class="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 (선택)</label>
+              <div class="flex items-center gap-2.5">
+                <img id="signup-avatar-preview" src="" alt="미리보기" class="w-11 h-11 rounded-full object-cover border border-teal-300 hidden shrink-0" />
+                <div id="signup-avatar-placeholder" class="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-sm shrink-0">👤</div>
+                <label for="signup-profile-file" class="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer text-center transition">
+                  사진 선택
+                </label>
+                <input id="signup-profile-file" type="file" accept="image/*" onchange="previewProfileImage(event, 'signup-avatar-preview', 'signup-avatar-placeholder')" class="hidden" />
+              </div>
+            </div>
+          </div>
+
+          <button id="btn-submit-signup" onclick="submitSignup()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+            회원가입 완료 및 시작하기
+          </button>
+        </div>
+
+        <!-- 아이디/비밀번호 찾기 뷰 -->
+        <div id="auth-view-find" class="hidden space-y-3.5">
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div class="text-xs font-bold text-slate-800">아이디 찾기</div>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input id="find-id-nickname" type="text" placeholder="가입한 닉네임 입력" class="flex-1 min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <button onclick="submitFindId()" class="min-h-[42px] px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0">조회</button>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div class="text-xs font-bold text-slate-800">비밀번호 재설정</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input id="reset-pw-username" type="text" placeholder="아이디 입력" class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="reset-pw-nickname" type="text" placeholder="닉네임 입력" class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+            </div>
+            <div class="relative">
+              <input id="reset-pw-new" type="password" placeholder="새 비밀번호 (4자 이상)" class="w-full min-h-[42px] px-3 py-2 pr-12 text-xs rounded-xl border border-slate-200 bg-white" />
+              <button type="button" onclick="togglePasswordVisibility('reset-pw-new', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500">표시</button>
+            </div>
+            <button onclick="submitResetPassword()" class="w-full min-h-[42px] py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold">비밀번호 변경</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- [MODAL 2] 계정 관리 모달                                              -->
+  <!-- ===================================================================== -->
+  <div id="account-modal-backdrop" onclick="if(event.target===this) closeAccountModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center p-3.5 sm:p-6">
+      <div class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 class="text-base sm:text-lg font-extrabold text-slate-900">내 계정 관리</h3>
+          <button onclick="closeAccountModal()" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold">✕</button>
+        </div>
+
+        <div id="account-alert-box" class="hidden p-3 rounded-xl text-xs font-bold break-words leading-relaxed"></div>
+
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="flex items-center gap-3.5">
+            <img id="acc-avatar-preview" src="" alt="프로필" class="w-12 h-12 rounded-full object-cover border border-teal-500 hidden shrink-0" />
+            <div id="acc-avatar-placeholder" class="w-12 h-12 rounded-full bg-teal-600 text-white font-black text-base flex items-center justify-center shrink-0">U</div>
+            <div class="min-w-0">
+              <div class="text-xs sm:text-sm font-extrabold text-slate-900 truncate" id="acc-current-nickname">회원님</div>
+              <div class="text-[11px] text-slate-500 truncate" id="acc-current-username">아이디: @user</div>
+              <div class="text-[10px] text-slate-400" id="acc-created-at">가입일: -</div>
+            </div>
+          </div>
+          <div class="pt-2 border-t border-slate-200/80 flex flex-wrap gap-1.5 text-[11px]" id="acc-data-summary-badges"></div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">닉네임 변경</label>
+              <input id="acc-nickname-input" type="text" class="w-full min-h-[42px] px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 변경</label>
+              <label for="acc-profile-file" class="w-full min-h-[42px] px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold flex items-center justify-center cursor-pointer transition">
+                📷 새 프로필 사진 선택
+              </label>
+              <input id="acc-profile-file" type="file" accept="image/*" onchange="previewProfileImage(event, 'acc-avatar-preview', 'acc-avatar-placeholder')" class="hidden" />
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="text-xs font-bold text-slate-800">비밀번호 변경 (선택)</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input id="acc-current-pw" type="password" placeholder="현재 비밀번호" class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="acc-new-pw" type="password" placeholder="새 비밀번호 (4자 이상)" class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+            </div>
+          </div>
+
+          <button onclick="submitProfileUpdate()" class="w-full min-h-[44px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm shadow-xs">
+            변경사항 저장
+          </button>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <button onclick="handleLogout(); closeAccountModal();" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+              로그아웃
+            </button>
+            <button onclick="document.getElementById('delete-account-box').classList.toggle('hidden')" class="text-xs text-rose-500 hover:underline font-bold py-1">
+              회원 탈퇴
+            </button>
+          </div>
+
+          <div id="delete-account-box" class="hidden p-3.5 rounded-xl bg-rose-50 border border-rose-200 space-y-2.5">
+            <p class="text-[11px] text-rose-800 font-semibold">탈퇴 시 계정에 저장된 데이터가 모두 삭제됩니다.</p>
+            <div class="flex gap-2">
+              <input id="delete-confirm-pw" type="password" placeholder="비밀번호 입력" class="flex-1 min-h-[40px] px-3 py-2 text-xs rounded-xl border border-rose-300 bg-white" />
+              <button onclick="submitDeleteAccount()" class="min-h-[40px] px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold shrink-0">탈퇴 확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 자바스크립트 로직 ==================== -->
+  <script>
+    // 단일 서버(8000번 포트 / HTTPS 터널 / 클라우드)와 별도 로컬 정적 서버 환경 모두 자동 호환
+    const API_BASE = (
+      window.location.protocol === "file:" ||
+      (window.location.port && window.location.port !== "8000")
+    )
+      ? `http://${window.location.hostname || "127.0.0.1"}:8000`
+      : "";
+
+    const DUMMY_IDS = new Set([9001, 9002, 9003, 9004]);
+    const DUMMY_NAMES = new Set(["샘플A", "샘플B", "샘플C", "샘플D", "샘플 A", "샘플 B", "샘플 C", "샘플 D"]);
+
+    function isDummyProduct(item) {
+      if (!item || typeof item !== "object") return false;
+      const numId = Number(item.product_id || item.id || 0);
+      if (DUMMY_IDS.has(numId)) return true;
+      const rawName = String(item.name || item.product_name || "").trim();
+      const cleanName = rawName.replace(/^\[.*?\]\s*/, "").trim();
+      return DUMMY_NAMES.has(rawName) || DUMMY_NAMES.has(cleanName);
+    }
+
+    // -------------------- 전역 상태 변수 --------------------
+    let currentUser = null;
+    let authToken = null;
+    let isUsernameVerified = false;
+    let verifiedUsernameValue = "";
+
+    let selectedSkinType = "수부지";
+    let hasConfiguredProfile = false;
+    let currentRegionKey = "수원";
+
+    let currentWeatherObj = {
+      status: "loading",
+      is_live: false,
+      data_source: "LOADING",
+      source_label: "데이터 수신 중",
+      region_name: "경기도 수원시",
+      temp: null,
+      humidity: null,
+      uv_index: null,
+      uv_level: "조회 중",
+      uv_level_code: "LOADING",
+      uv_max_today: null,
+      uv_max_level: "조회 중",
+      uv_max_level_code: "LOADING",
+      uv_max_tomorrow: null,
+      uv_tomorrow_level: "조회 중",
+      uv_context_note: "",
+      pm25: null,
+      pm10: null,
+      weather_desc: "기상 조회 중...",
+      updated_at: "-",
+      error_reason: "",
+      fallback_notice: "",
+      skincare_tips: [],
+      recommendation_rationale: []
+    };
+
+    let scanProductList = [];
+    let scanSearchResultsCache = [];
+    let replaceTargetIndex = null;
+
+    let selectedSupplements = [];
+    let vanityBasket = [];
+    let vanityReplaceTargetIndex = null;
+    let vanityConflictCache = null;
+    let vanitySelectedFilterId = null;
+    let selectedCosmeticCategory = "";
+
+    let lastRoutineApiData = null;
+    let editableMorningSteps = [];
+    let editableNightSteps = [];
+
+    let archiveList = [];
+    let archiveCurrentPage = 1;
+    const ARCHIVE_PAGE_SIZE = 10;
+
+    // -------------------- 모바일 웹 카메라 & OCR 자동 인식 상태 --------------------
+    let cameraMediaStream = null;
+    let currentCameraFacingMode = "environment";
+    let pendingOcrImageFile = null;
+    let pendingOcrPreviewUrl = null;
+    let lastOcrExtractedProduct = null;
+
+    // -------------------- 초기 구동 --------------------
+    window.addEventListener("DOMContentLoaded", async () => {
+      resetToCleanGuestState();
+      await tryAutoLoginOnStartup();
+      await fetchRealtimeWeather(currentRegionKey);
+      loadCosmeticList();
+      searchCosmeticForScan("");
+      renderAllViews();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeAuthModal();
+        closeAccountModal();
+      }
+    });
+
+    function showGlobalToast(message, tone = "teal") {
+      const box = document.getElementById("global-toast-banner");
+      const inner = document.getElementById("global-toast-inner");
+      const textEl = document.getElementById("global-toast-text");
+      if (!box || !inner || !textEl) return;
+
+      const styles = {
+        teal: "p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 bg-teal-50 border border-teal-200 text-teal-900",
+        amber: "p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 text-amber-900",
+        slate: "p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 bg-slate-100 border border-slate-200 text-slate-800"
+      };
+      inner.className = styles[tone] || styles.teal;
+      textEl.textContent = message;
+      box.classList.remove("hidden");
+
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        box.classList.add("hidden");
+      }, 4500);
+    }
+
+    function hideGlobalToast() {
+      const box = document.getElementById("global-toast-banner");
+      if (box) box.classList.add("hidden");
+    }
+
+    function resetToCleanGuestState() {
+      stopWebCamera();
+      clearOcrPhotoPreview();
+      resetOcrFormFields();
+      selectedSkinType = "수부지";
+      hasConfiguredProfile = false;
+      scanProductList = [];
+      replaceTargetIndex = null;
+      selectedSupplements = [];
+      vanityBasket = [];
+      vanityReplaceTargetIndex = null;
+      vanityConflictCache = null;
+      vanitySelectedFilterId = null;
+      lastRoutineApiData = null;
+      editableMorningSteps = [];
+      editableNightSteps = [];
+      archiveList = [];
+      archiveCurrentPage = 1;
+      currentRegionKey = "수원";
+
+      document.getElementById("routine-concern-select").value = "수분/속건조";
+      document.getElementById("routine-style-select").value = "3";
+      document.getElementById("supplement-limit-select").value = "3";
+      document.getElementById("life-makeup").value = "1";
+      document.getElementById("life-sleep").value = "1";
+      document.getElementById("life-outdoor").value = "1";
+      document.getElementById("life-alcohol").value = "0";
+      document.getElementById("life-workout").value = "1";
+      document.getElementById("env-region-select").value = "수원";
+      const scanSearch = document.getElementById("scan-cosmetic-input");
+      if (scanSearch) scanSearch.value = "";
+      const vanitySearch = document.getElementById("routine-cosmetic-search");
+      if (vanitySearch) vanitySearch.value = "";
+      const suppSearch = document.getElementById("supp-search-input");
+      if (suppSearch) suppSearch.value = "";
+      updateSkinTypeButtonsUI();
+    }
+
+    function renderAllViews() {
+      updateAuthHeaderUI();
+      updateSkinTypeButtonsUI();
+      renderScanProductList();
+      renderScanSearchResultsList();
+      renderSelectedSupplements();
+      renderVanityBasket();
+      runVanityAutoConflictAnalysis();
+      runTab1MultiAnalysis();
+      renderAiRoutineEmptyOrResult();
+      updateArchiveBadge();
+      renderArchiveList();
+      renderHomeDashboard();
+    }
+
+    function selectSkinType(sType) {
+      selectedSkinType = sType;
+      hasConfiguredProfile = true;
+      updateSkinTypeButtonsUI();
+      runTab2AiRoutine();
+      syncUserStateToServer();
+    }
+
+    function updateSkinTypeButtonsUI() {
+      const btns = document.querySelectorAll(".skin-type-btn");
+      btns.forEach(btn => {
+        const st = btn.getAttribute("data-stype");
+        if (st === selectedSkinType) {
+          btn.className = "skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-bold transition bg-teal-600 text-white border-teal-700 shadow-2xs";
+        } else {
+          btn.className = "skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400";
+        }
+      });
+    }
+
+    // =========================================================================
+    // [실시간 날씨 및 정밀 UV 연동]
+    // =========================================================================
+    function getUvBadgeClass(levelCode) {
+      if (levelCode === "EXTREME") return "px-1.5 py-0.5 rounded bg-purple-700 text-white text-[10px] font-extrabold";
+      if (levelCode === "VERY_HIGH") return "px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-extrabold";
+      if (levelCode === "HIGH") return "px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-extrabold";
+      if (levelCode === "MODERATE") return "px-1.5 py-0.5 rounded bg-sky-600 text-white text-[10px] font-extrabold";
+      if (levelCode === "LOW") return "px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold";
+      return "px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[10px] font-extrabold";
+    }
+
+    function getPm25Meta(pmVal) {
+      if (pmVal === null || pmVal === undefined) {
+        return { label: "측정 불가", badgeCls: "px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[10px] font-extrabold" };
+      }
+      if (pmVal <= 15.0) {
+        return { label: "좋음", badgeCls: "px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold" };
+      }
+      if (pmVal <= 35.0) {
+        return { label: "보통", badgeCls: "px-1.5 py-0.5 rounded bg-sky-600 text-white text-[10px] font-extrabold" };
+      }
+      if (pmVal <= 75.0) {
+        return { label: "나쁨", badgeCls: "px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-extrabold" };
+      }
+      return { label: "매우 나쁨", badgeCls: "px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-extrabold" };
+    }
+
+    async function fetchRealtimeWeather(region = "수원", lat = null, lon = null) {
+      let url = `${API_BASE}/api/v1/environment/weather?region=${encodeURIComponent(region)}`;
+      if (lat !== null && lon !== null) url += `&lat=${lat}&lon=${lon}`;
+
+      document.getElementById("env-source-badge").className = "px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold";
+      document.getElementById("env-source-badge").textContent = "수신 중...";
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        currentWeatherObj = data;
+        renderWeatherWidget(data);
+      } catch (e) {
+        currentWeatherObj = {
+          status: "unavailable",
+          is_live: false,
+          data_source: "UNAVAILABLE",
+          source_label: "데이터 수신 실패 (서버 연결 오류)",
+          region_name: `${region} 지역`,
+          temp: null,
+          humidity: null,
+          uv_index: null,
+          uv_level: "측정 불가",
+          uv_level_code: "UNAVAILABLE",
+          uv_max_today: null,
+          uv_max_level: "측정 불가",
+          uv_max_level_code: "UNAVAILABLE",
+          uv_max_tomorrow: null,
+          uv_tomorrow_level: "측정 불가",
+          uv_context_note: "",
+          pm25: null,
+          pm10: null,
+          weather_desc: "수신 실패 ⚠️",
+          updated_at: new Date().toLocaleTimeString("ko-KR"),
+          error_reason: "API 서버에 연결할 수 없어 실시간 기상·UV 데이터를 불러오지 못했습니다.",
+          fallback_notice: "데이터 수신에 실패하여 임의의 기본값을 표시하지 않았습니다.",
+          skincare_tips: ["기상 데이터 수신 실패로 인해 피부 유형과 생활패턴 기준으로 스킨케어를 안내합니다."],
+          recommendation_rationale: []
+        };
+        renderWeatherWidget(currentWeatherObj);
+      }
+    }
+
+    function onRegionSelectChange(regionVal) {
+      currentRegionKey = regionVal;
+      fetchRealtimeWeather(regionVal);
+      syncUserStateToServer();
+    }
+
+    function requestUserGpsWeather() {
+      if (!navigator.geolocation) {
+        alert("위치 정보(GPS)를 지원하지 않는 브라우저입니다.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchRealtimeWeather(currentRegionKey, pos.coords.latitude, pos.coords.longitude),
+        () => fetchRealtimeWeather(currentRegionKey),
+        { timeout: 6000 }
+      );
+    }
+
+    function renderWeatherWidget(w) {
+      const isLive = w.data_source === "LIVE";
+      const isCached = w.data_source === "CACHED";
+      const isUnavailable = w.data_source === "UNAVAILABLE";
+
+      document.getElementById("env-card-region").textContent = w.region_name || "경기도 수원시";
+      document.getElementById("env-card-weather").textContent = w.weather_desc || (isUnavailable ? "수신 실패 ⚠️" : "기상 확인");
+
+      const sourceBadge = document.getElementById("env-source-badge");
+      if (isLive) {
+        sourceBadge.className = "px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-extrabold";
+        sourceBadge.textContent = "● 실시간 관측 데이터";
+      } else if (isCached) {
+        sourceBadge.className = "px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-extrabold";
+        sourceBadge.textContent = "● 최근 수신 캐시 (연결 지연)";
+      } else {
+        sourceBadge.className = "px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[11px] font-extrabold";
+        sourceBadge.textContent = "✕ 데이터 수신 실패 (실측값 없음)";
+      }
+
+      const timeTxt = w.updated_at && w.updated_at !== "-" ? `(${w.updated_at.slice(11, 16) || w.updated_at} 기준)` : "";
+      document.getElementById("env-updated-time").textContent = timeTxt;
+
+      document.getElementById("env-card-temp").textContent = (w.temp !== null && w.temp !== undefined) ? `${w.temp}°C` : "측정 불가";
+      document.getElementById("env-card-humidity").textContent = (w.humidity !== null && w.humidity !== undefined) ? `${w.humidity}%` : "측정 불가";
+
+      document.getElementById("env-card-uv").textContent = (w.uv_index !== null && w.uv_index !== undefined) ? `UV ${w.uv_index}` : "측정 불가";
+      const uvBadge = document.getElementById("env-uv-level-badge");
+      uvBadge.textContent = w.uv_level || "측정 불가";
+      uvBadge.className = getUvBadgeClass(w.uv_level_code);
+
+      document.getElementById("env-card-uv-max").textContent = (w.uv_max_today !== null && w.uv_max_today !== undefined) ? `UV ${w.uv_max_today}` : "측정 불가";
+      const uvMaxBadge = document.getElementById("env-uv-max-badge");
+      uvMaxBadge.textContent = w.uv_max_level || "측정 불가";
+      uvMaxBadge.className = getUvBadgeClass(w.uv_max_level_code);
+
+      const tmrEl = document.getElementById("env-card-uv-tomorrow");
+      if (w.uv_max_tomorrow !== null && w.uv_max_tomorrow !== undefined) {
+        tmrEl.textContent = `내일 최고 ${w.uv_max_tomorrow}`;
+      } else {
+        tmrEl.textContent = "";
+      }
+
+      document.getElementById("env-card-pm25").textContent = (w.pm25 !== null && w.pm25 !== undefined) ? `${w.pm25} ㎍/㎥` : "측정 불가";
+      const pmMeta = getPm25Meta(w.pm25);
+      const pmBadge = document.getElementById("env-pm25-badge");
+      pmBadge.textContent = pmMeta.label;
+      pmBadge.className = pmMeta.badgeCls;
+
+      const noticeBox = document.getElementById("env-status-notice-box");
+      if (isUnavailable) {
+        noticeBox.classList.remove("hidden");
+        noticeBox.className = "p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-2";
+        noticeBox.innerHTML = `
+          <div>
+            <b>⚠️ 기상·UV 데이터 수신 실패:</b> ${w.error_reason || w.fallback_notice || "실시간 관측 데이터를 가져오지 못해 임의의 기본값을 표시하지 않았습니다."}
+          </div>
+          <button onclick="fetchRealtimeWeather(currentRegionKey)" class="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold shrink-0 self-start sm:self-auto">
+            다시 시도
+          </button>`;
+      } else if (isCached) {
+        noticeBox.classList.remove("hidden");
+        noticeBox.className = "p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed";
+        noticeBox.innerHTML = `<b>ℹ️ 대체(캐시) 데이터 안내:</b> ${w.fallback_notice}`;
+      } else if (w.uv_context_note) {
+        noticeBox.classList.remove("hidden");
+        noticeBox.className = "p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] leading-relaxed";
+        noticeBox.innerHTML = `ℹ️ ${w.uv_context_note}`;
+      } else {
+        noticeBox.classList.add("hidden");
+      }
+
+      const primaryTipEl = document.getElementById("env-primary-tip-text");
+      const rationaleListEl = document.getElementById("env-rationale-detail-list");
+      const tips = Array.isArray(w.skincare_tips) ? w.skincare_tips : [];
+      const rationaleItems = Array.isArray(w.recommendation_rationale) ? w.recommendation_rationale : [];
+
+      primaryTipEl.textContent = tips.length > 0
+        ? `💡 ${tips[0]}`
+        : "기상 조건에 따른 맞춤 스킨케어 가이드를 확인하세요.";
+
+      if (rationaleItems.length > 0) {
+        rationaleListEl.innerHTML = rationaleItems.map(item => `
+          <div class="p-2.5 rounded-lg bg-white border border-teal-100 space-y-0.5">
+            <div class="flex flex-wrap items-center justify-between gap-1">
+              <span class="font-extrabold text-teal-900">• ${item.factor}</span>
+              <span class="px-2 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold">${item.action}</span>
+            </div>
+            <div class="text-slate-600 leading-relaxed">${item.reason}</div>
+          </div>`).join("");
+      } else {
+        rationaleListEl.innerHTML = `<div class="text-slate-500">수신된 기상 실측치가 없어 환경 세부 근거 대신 피부 유형과 생활패턴을 우선 반영합니다.</div>`;
+      }
+    }
+
+    // =========================================================================
+    // [홈 대시보드 렌더링]
+    // =========================================================================
+    function renderHomeDashboard() {
+      const vCount = vanityBasket.length;
+      document.getElementById("dash-vanity-count").textContent = `${vCount}종 등록됨`;
+      document.getElementById("dash-vanity-desc").textContent = vCount === 0
+        ? "등록된 화장품이 없습니다."
+        : `${vanityBasket.slice(0, 2).map(x => x.name).join(", ")}${vCount > 2 ? ` 외 ${vCount - 2}종` : ""}`;
+
+      const cTitle = document.getElementById("dash-conflict-title");
+      const cDesc = document.getElementById("dash-conflict-desc");
+      if (vanityConflictCache && vanityBasket.length >= 2) {
+        const hc = vanityConflictCache.risk_summary_counts.high_caution || 0;
+        const cc = vanityConflictCache.risk_summary_counts.caution || 0;
+        cTitle.textContent = `높은 주의 ${hc}건 · 주의 ${cc}건`;
+        cDesc.textContent = `보유 제품 ${vanityConflictCache.total_pairs_count}개 조합 검증 완료`;
+      } else {
+        cTitle.textContent = "주의 조합 0건";
+        cDesc.textContent = "제품 2종 이상 등록 시 자동 분석됩니다.";
+      }
+
+      const skinConcernEl = document.getElementById("dash-skin-concern");
+      const skinStyleEl = document.getElementById("dash-skin-style");
+      if (!lastRoutineApiData && !hasConfiguredProfile && selectedSupplements.length === 0) {
+        skinConcernEl.textContent = "미설정";
+        skinStyleEl.textContent = "피부 유형과 고민을 선택해 주세요.";
+      } else {
+        const concernVal = document.getElementById("routine-concern-select").value;
+        const styleSel = document.getElementById("routine-style-select");
+        const styleText = styleSel.options[styleSel.selectedIndex].text.split(":")[0].trim();
+        skinConcernEl.textContent = `[${selectedSkinType}] ${concernVal}`;
+        skinStyleEl.textContent = `${styleText} · 영양제 ${selectedSupplements.length}종`;
+      }
+
+      const aiScoreEl = document.getElementById("dash-ai-score");
+      const aiDescEl = document.getElementById("dash-ai-desc");
+      if (lastRoutineApiData && lastRoutineApiData.score_evaluation) {
+        const sc = lastRoutineApiData.score_evaluation;
+        aiScoreEl.textContent = `${sc.total_score}점 / 100점`;
+        aiDescEl.textContent = `보유 화장품 활용률 ${sc.utilization_rate}% (${sc.used_owned_count}/${sc.total_owned_count}종)`;
+      } else {
+        aiScoreEl.textContent = "분석 전";
+        aiDescEl.textContent = "AI 맞춤 루틴 추천을 실행해 보세요.";
+      }
+
+      const amBox = document.getElementById("dash-am-routine-list");
+      const pmBox = document.getElementById("dash-pm-routine-list");
+
+      if (!lastRoutineApiData || editableMorningSteps.length === 0) {
+        amBox.innerHTML = `<div class="p-4 rounded-xl bg-slate-50 text-slate-400 text-center">생성된 아침 루틴이 없습니다.</div>`;
+      } else {
+        amBox.innerHTML = editableMorningSteps.map((s, idx) => {
+          const pName = s.owned_product
+            ? `<span class="text-teal-700 font-bold">[보유] ${s.owned_product.name}</span>`
+            : (s.recommended_products && s.recommended_products[0] ? `<span class="text-slate-600">[추천] ${s.recommended_products[0].name} 외 ${Math.max(0, s.recommended_products.length - 1)}종</span>` : "");
+          return `
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+              <span class="font-bold text-slate-800 break-words">${idx + 1}. ${s.step_title}</span>
+              <span class="text-[11px] break-words">${pName}</span>
+            </div>`;
+        }).join("");
+      }
+
+      if (!lastRoutineApiData || editableNightSteps.length === 0) {
+        pmBox.innerHTML = `<div class="p-4 rounded-xl bg-slate-50 text-slate-400 text-center">생성된 저녁 루틴이 없습니다.</div>`;
+      } else {
+        pmBox.innerHTML = editableNightSteps.map((s, idx) => {
+          const pName = s.owned_product
+            ? `<span class="text-teal-700 font-bold">[보유] ${s.owned_product.name}</span>`
+            : (s.recommended_products && s.recommended_products[0] ? `<span class="text-slate-600">[추천] ${s.recommended_products[0].name} 외 ${Math.max(0, s.recommended_products.length - 1)}종</span>` : "");
+          return `
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+              <span class="font-bold text-slate-800 break-words">${idx + 1}. ${s.step_title}</span>
+              <span class="text-[11px] break-words">${pName}</span>
+            </div>`;
+        }).join("");
+      }
+
+      const recentBox = document.getElementById("dash-recent-reports-box");
+      if (archiveList.length === 0) {
+        recentBox.innerHTML = `<div class="p-4 rounded-xl bg-slate-50 text-slate-400 text-center">저장된 분석 리포트가 없습니다.</div>`;
+      } else {
+        const latest = archiveList[0];
+        recentBox.innerHTML = `
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <div class="min-w-0">
+              <span class="font-bold text-slate-900 block sm:inline">[${latest.type}] ${latest.title}</span>
+              <span class="text-slate-500 sm:ml-2 block sm:inline mt-0.5 sm:mt-0">${latest.summary}</span>
+            </div>
+            <span class="text-[11px] text-slate-400 shrink-0">${latest.date}</span>
+          </div>`;
+      }
+    }
+
+    // =========================================================================
+    // [회원 인증 · 자동 로그인 · 로그아웃 · 사용자별 데이터 분리/복원 처리]
+    // =========================================================================
+    async function tryAutoLoginOnStartup() {
+      const autoLoginFlag = localStorage.getItem("skinlogic_auto_login") === "true";
+      const savedTok = autoLoginFlag
+        ? localStorage.getItem("skinlogic_auth_token")
+        : sessionStorage.getItem("skinlogic_auth_token");
+
+      if (!savedTok) {
+        updateAuthHeaderUI();
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+          headers: { "Authorization": `Bearer ${savedTok}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          authToken = savedTok;
+          currentUser = data.user;
+          applyUserStateFromServer(data.state);
+          updateAuthHeaderUI();
+        } else {
+          localStorage.removeItem("skinlogic_auth_token");
+          localStorage.removeItem("skinlogic_auto_login");
+          sessionStorage.removeItem("skinlogic_auth_token");
+          resetToCleanGuestState();
+          updateAuthHeaderUI();
+        }
+      } catch (e) {
+        updateAuthHeaderUI();
+      }
+    }
+
+    function applyUserStateFromServer(stateObj) {
+      resetToCleanGuestState();
+      if (!stateObj) {
+        renderAllViews();
+        return;
+      }
+      if (stateObj.selected_region) {
+        currentRegionKey = stateObj.selected_region;
+        document.getElementById("env-region-select").value = currentRegionKey;
+      }
+      scanProductList = (Array.isArray(stateObj.scan_product_list) ? stateObj.scan_product_list : []).filter(x => !isDummyProduct(x));
+      selectedSupplements = Array.isArray(stateObj.selected_supplements) ? stateObj.selected_supplements : [];
+      vanityBasket = (Array.isArray(stateObj.vanity_basket) ? stateObj.vanity_basket : []).filter(x => !isDummyProduct(x));
+      archiveList = Array.isArray(stateObj.archive_list) ? stateObj.archive_list : [];
+      lastRoutineApiData = stateObj.last_ai_result || null;
+
+      if (stateObj.routine_prefs) {
+        const rp = stateObj.routine_prefs;
+        if (rp.skin_type) selectedSkinType = rp.skin_type;
+        if (rp.concern) document.getElementById("routine-concern-select").value = rp.concern;
+        if (rp.care_style_id) document.getElementById("routine-style-select").value = String(rp.care_style_id);
+        if (rp.supplement_limit) document.getElementById("supplement-limit-select").value = String(rp.supplement_limit);
+        if (rp.makeup !== undefined) document.getElementById("life-makeup").value = String(rp.makeup);
+        if (rp.sleep !== undefined) document.getElementById("life-sleep").value = String(rp.sleep);
+        if (rp.outdoor !== undefined) document.getElementById("life-outdoor").value = String(rp.outdoor);
+        if (rp.alcohol !== undefined) document.getElementById("life-alcohol").value = String(rp.alcohol);
+        if (rp.workout !== undefined) document.getElementById("life-workout").value = String(rp.workout);
+      }
+
+      if (stateObj.custom_routine) {
+        editableMorningSteps = Array.isArray(stateObj.custom_routine.morning_steps) ? stateObj.custom_routine.morning_steps : [];
+        editableNightSteps = Array.isArray(stateObj.custom_routine.night_steps) ? stateObj.custom_routine.night_steps : [];
+      }
+
+      hasConfiguredProfile = Boolean(lastRoutineApiData || vanityBasket.length > 0 || selectedSupplements.length > 0);
+      renderAllViews();
+    }
+
+    async function syncUserStateToServer() {
+      renderHomeDashboard();
+      if (!authToken || !currentUser) return;
+
+      const payload = {
+        selected_region: currentRegionKey,
+        scan_product_list: scanProductList.filter(x => !isDummyProduct(x)),
+        selected_supplements: selectedSupplements,
+        vanity_basket: vanityBasket.filter(x => !isDummyProduct(x)),
+        routine_prefs: {
+          skin_type: selectedSkinType,
+          concern: document.getElementById("routine-concern-select").value,
+          care_style_id: parseInt(document.getElementById("routine-style-select").value, 10),
+          supplement_limit: parseInt(document.getElementById("supplement-limit-select").value, 10),
+          makeup: parseInt(document.getElementById("life-makeup").value, 10),
+          sleep: parseInt(document.getElementById("life-sleep").value, 10),
+          outdoor: parseInt(document.getElementById("life-outdoor").value, 10),
+          alcohol: parseInt(document.getElementById("life-alcohol").value, 10),
+          workout: parseInt(document.getElementById("life-workout").value, 10)
+        },
+        custom_routine: {
+          morning_steps: editableMorningSteps,
+          night_steps: editableNightSteps
+        },
+        last_ai_result: lastRoutineApiData,
+        archive_list: archiveList
+      };
+
+      try {
+        await fetch(`${API_BASE}/api/v1/user/state`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${authToken}`
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {}
+    }
+
+    function onRoutinePrefChange() {
+      hasConfiguredProfile = true;
+      runTab2AiRoutine();
+      syncUserStateToServer();
+    }
+
+    async function handleLogout() {
+      if (authToken && currentUser) {
+        await syncUserStateToServer();
+        try {
+          await fetch(`${API_BASE}/api/v1/auth/logout`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${authToken}` }
+          });
+        } catch (e) {}
+      }
+      const prevNick = currentUser ? currentUser.nickname : "";
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem("skinlogic_auth_token");
+      localStorage.removeItem("skinlogic_auto_login");
+      sessionStorage.removeItem("skinlogic_auth_token");
+
+      resetToCleanGuestState();
+      renderAllViews();
+      switchTab("home");
+      if (prevNick) {
+        showGlobalToast(`${prevNick}님 로그아웃 완료 — 개인 데이터는 계정에 보관되었으며 화면은 초기화되었습니다.`, "slate");
+      }
+    }
+
+    function updateAuthHeaderUI() {
+      const guestEl = document.getElementById("header-auth-guest");
+      const userEl = document.getElementById("header-auth-user");
+      if (!currentUser) {
+        guestEl.classList.remove("hidden");
+        userEl.classList.add("hidden");
+        userEl.classList.remove("flex");
+        return;
+      }
+      guestEl.classList.add("hidden");
+      userEl.classList.remove("hidden");
+      userEl.classList.add("flex");
+
+      document.getElementById("header-user-nickname").textContent = currentUser.nickname;
+
+      const avatarImg = document.getElementById("header-user-avatar");
+      const avatarFallback = document.getElementById("header-user-avatar-fallback");
+      if (currentUser.profile_image) {
+        avatarImg.src = `${API_BASE}${currentUser.profile_image}`;
+        avatarImg.classList.remove("hidden");
+        avatarFallback.classList.add("hidden");
+      } else {
+        avatarImg.classList.add("hidden");
+        avatarFallback.classList.remove("hidden");
+        avatarFallback.textContent = (currentUser.nickname || "U").charAt(0).toUpperCase();
+      }
+    }
+
+    function togglePasswordVisibility(inputId, btnEl) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      if (inp.type === "password") {
+        inp.type = "text";
+        btnEl.textContent = "숨김";
+      } else {
+        inp.type = "password";
+        btnEl.textContent = "표시";
+      }
+    }
+
+    function previewProfileImage(event, previewImgId, placeholderId) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.getElementById(previewImgId);
+        const ph = document.getElementById(placeholderId);
+        img.src = e.target.result;
+        img.classList.remove("hidden");
+        if (ph) ph.classList.add("hidden");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openAuthModal(mode = "LOGIN") {
+      document.getElementById("auth-modal-backdrop").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      switchAuthMode(mode);
+    }
+
+    function closeAuthModal() {
+      document.getElementById("auth-modal-backdrop").classList.add("hidden");
+      document.body.style.overflow = "";
+      hideAuthAlert();
+    }
+
+    function showAuthAlert(msg, isError = true) {
+      const box = document.getElementById("auth-alert-box");
+      box.classList.remove("hidden");
+      box.className = isError
+        ? "p-3 rounded-xl text-xs font-bold bg-rose-50 border border-rose-200 text-rose-700 break-words leading-relaxed"
+        : "p-3 rounded-xl text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800 break-words leading-relaxed";
+      box.textContent = msg;
+    }
+
+    function hideAuthAlert() {
+      document.getElementById("auth-alert-box").classList.add("hidden");
+    }
+
+    function switchAuthMode(mode) {
+      hideAuthAlert();
+      const views = { LOGIN: "auth-view-login", SIGNUP: "auth-view-signup", FIND: "auth-view-find" };
+      const tabs = { LOGIN: "auth-tab-login", SIGNUP: "auth-tab-signup", FIND: "auth-tab-find" };
+      const titles = { LOGIN: "로그인", SIGNUP: "회원가입", FIND: "아이디 찾기 · 비밀번호 재설정" };
+
+      document.getElementById("auth-modal-title").textContent = titles[mode] || "인증";
+      Object.keys(views).forEach(k => {
+        const vEl = document.getElementById(views[k]);
+        const tEl = document.getElementById(tabs[k]);
+        if (k === mode) {
+          vEl.classList.remove("hidden");
+          tEl.className = "py-2 rounded-lg bg-white text-teal-700 shadow-2xs transition";
+        } else {
+          vEl.classList.add("hidden");
+          tEl.className = "py-2 rounded-lg text-slate-600 hover:text-slate-900 transition";
+        }
+      });
+    }
+
+    function onSignupUsernameInput() {
+      const currentVal = document.getElementById("signup-username").value.trim();
+      if (currentVal !== verifiedUsernameValue) {
+        isUsernameVerified = false;
+        const msgEl = document.getElementById("signup-id-check-msg");
+        msgEl.textContent = "아이디 중복 확인을 진행해 주세요.";
+        msgEl.className = "text-[11px] text-amber-600 font-semibold mt-1";
+      }
+    }
+
+    async function checkUsernameDuplicate() {
+      const uname = document.getElementById("signup-username").value.trim();
+      const msgEl = document.getElementById("signup-id-check-msg");
+      if (uname.length < 3) {
+        msgEl.textContent = "아이디는 3자 이상 입력해 주세요.";
+        msgEl.className = "text-[11px] text-rose-600 font-bold mt-1";
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/check-username?username=${encodeURIComponent(uname)}`);
+        const data = await res.json();
+        if (data.available) {
+          isUsernameVerified = true;
+          verifiedUsernameValue = uname;
+          msgEl.textContent = `✓ ${data.message}`;
+          msgEl.className = "text-[11px] text-emerald-700 font-bold mt-1";
+        } else {
+          isUsernameVerified = false;
+          msgEl.textContent = `✕ ${data.message}`;
+          msgEl.className = "text-[11px] text-rose-600 font-bold mt-1";
+        }
+      } catch (e) {
+        msgEl.textContent = "서버 연결을 확인해 주세요.";
+      }
+    }
+
+    function checkSignupPwMatch() {
+      const pw1 = document.getElementById("signup-password").value;
+      const pw2 = document.getElementById("signup-password-confirm").value;
+      const msgEl = document.getElementById("signup-pw-match-msg");
+      if (!pw2) { msgEl.textContent = ""; return; }
+      if (pw1 === pw2) {
+        msgEl.textContent = "✓ 비밀번호가 일치합니다.";
+        msgEl.className = "text-[11px] text-emerald-700 font-bold -mt-1";
+      } else {
+        msgEl.textContent = "✕ 비밀번호가 일치하지 않습니다.";
+        msgEl.className = "text-[11px] text-rose-600 font-bold -mt-1";
+      }
+    }
+
+    async function submitSignup() {
+      const uname = document.getElementById("signup-username").value.trim();
+      const pw1 = document.getElementById("signup-password").value;
+      const pw2 = document.getElementById("signup-password-confirm").value;
+      const nick = document.getElementById("signup-nickname").value.trim();
+      const fileInp = document.getElementById("signup-profile-file");
+      const btn = document.getElementById("btn-submit-signup");
+
+      if (!isUsernameVerified || uname !== verifiedUsernameValue) {
+        showAuthAlert("먼저 [중복 확인] 버튼을 눌러주세요.", true);
+        return;
+      }
+      if (pw1.length < 4) {
+        showAuthAlert("비밀번호는 4자 이상이어야 합니다.", true);
+        return;
+      }
+      if (pw1 !== pw2) {
+        showAuthAlert("비밀번호가 일치하지 않습니다.", true);
+        return;
+      }
+      if (!nick) {
+        showAuthAlert("닉네임을 입력해 주세요.", true);
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append("username", uname);
+      fd.append("password", pw1);
+      fd.append("nickname", nick);
+      if (fileInp.files[0]) fd.append("profile_file", fileInp.files[0]);
+
+      btn.disabled = true;
+      btn.textContent = "회원가입 처리 중...";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/signup`, { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          showAuthAlert(data.message || "회원가입 실패", true);
+          return;
+        }
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem("skinlogic_auth_token", authToken);
+        localStorage.setItem("skinlogic_auto_login", "true");
+        applyUserStateFromServer(data.state);
+        updateAuthHeaderUI();
+        closeAuthModal();
+        showGlobalToast(`${data.user.nickname}님 가입을 환영합니다! 회원 전용 데이터 공간이 생성되었습니다.`, "teal");
+      } catch (e) {
+        showAuthAlert("서버와 통신할 수 없습니다.", true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "회원가입 완료 및 시작하기";
+      }
+    }
+
+    async function submitLogin() {
+      const uname = document.getElementById("login-username").value.trim();
+      const pw = document.getElementById("login-password").value;
+      const remember = document.getElementById("login-remember-check").checked;
+      const btn = document.getElementById("btn-submit-login");
+
+      if (!uname || !pw) {
+        showAuthAlert("아이디와 비밀번호를 모두 입력해 주세요.", true);
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "로그인 및 데이터 복원 중...";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: uname, password: pw, remember_me: remember })
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          showAuthAlert(data.message || "로그인에 실패했습니다.", true);
+          return;
+        }
+        authToken = data.token;
+        currentUser = data.user;
+        if (remember) {
+          localStorage.setItem("skinlogic_auth_token", authToken);
+          localStorage.setItem("skinlogic_auto_login", "true");
+          sessionStorage.removeItem("skinlogic_auth_token");
+        } else {
+          localStorage.removeItem("skinlogic_auth_token");
+          localStorage.setItem("skinlogic_auto_login", "false");
+          sessionStorage.setItem("skinlogic_auth_token", authToken);
+        }
+        applyUserStateFromServer(data.state);
+        if (data.state && data.state.selected_region) {
+          await fetchRealtimeWeather(data.state.selected_region);
+        }
+        updateAuthHeaderUI();
+        closeAuthModal();
+        showGlobalToast(`${data.user.nickname}님 환영합니다! 화장대(${vanityBasket.length}종)와 저장된 설정이 복원되었습니다.`, "teal");
+      } catch (e) {
+        showAuthAlert("서버 연결 실패", true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "로그인 및 내 데이터 불러오기";
+      }
+    }
+
+    async function submitFindId() {
+      const nick = document.getElementById("find-id-nickname").value.trim();
+      if (!nick) { showAuthAlert("닉네임을 입력해 주세요.", true); return; }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/find-account`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "FIND_ID", nickname: nick })
+        });
+        const data = await res.json();
+        showAuthAlert(data.message, !res.ok);
+      } catch (e) { showAuthAlert("서버 오류", true); }
+    }
+
+    async function submitResetPassword() {
+      const uname = document.getElementById("reset-pw-username").value.trim();
+      const nick = document.getElementById("reset-pw-nickname").value.trim();
+      const newPw = document.getElementById("reset-pw-new").value;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/find-account`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "RESET_PW", username: uname, nickname: nick, new_password: newPw })
+        });
+        const data = await res.json();
+        showAuthAlert(data.message, !res.ok);
+      } catch (e) { showAuthAlert("서버 오류", true); }
+    }
+
+    function openAccountModal() {
+      if (!currentUser) return;
+      document.getElementById("account-alert-box").classList.add("hidden");
+      document.getElementById("acc-current-nickname").textContent = currentUser.nickname;
+      document.getElementById("acc-current-username").textContent = `아이디: @${currentUser.username} (회원 고유번호 #${currentUser.user_id})`;
+      document.getElementById("acc-created-at").textContent = `가입일: ${currentUser.created_at || "-"}`;
+      document.getElementById("acc-nickname-input").value = currentUser.nickname;
+      document.getElementById("acc-current-pw").value = "";
+      document.getElementById("acc-new-pw").value = "";
+      document.getElementById("delete-confirm-pw").value = "";
+
+      const summaryBadges = document.getElementById("acc-data-summary-badges");
+      if (summaryBadges) {
+        summaryBadges.innerHTML = `
+          <span class="px-2 py-0.5 rounded bg-teal-50 text-teal-800 font-bold">화장대 ${vanityBasket.length}종</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">영양제 ${selectedSupplements.length}종</span>
+          <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 font-bold">피부유형 ${selectedSkinType}</span>
+          <span class="px-2 py-0.5 rounded bg-slate-200/80 text-slate-700 font-bold">리포트 ${archiveList.length}건</span>
+        `;
+      }
+
+      const prevImg = document.getElementById("acc-avatar-preview");
+      const ph = document.getElementById("acc-avatar-placeholder");
+      if (currentUser.profile_image) {
+        prevImg.src = `${API_BASE}${currentUser.profile_image}`;
+        prevImg.classList.remove("hidden");
+        ph.classList.add("hidden");
+      } else {
+        prevImg.classList.add("hidden");
+        ph.classList.remove("hidden");
+        ph.textContent = (currentUser.nickname || "U").charAt(0).toUpperCase();
+      }
+      document.getElementById("account-modal-backdrop").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeAccountModal() {
+      document.getElementById("account-modal-backdrop").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    function showAccountAlert(msg, isError = true) {
+      const box = document.getElementById("account-alert-box");
+      box.classList.remove("hidden");
+      box.className = isError
+        ? "p-3 rounded-xl text-xs font-bold bg-rose-50 border border-rose-200 text-rose-700 break-words leading-relaxed"
+        : "p-3 rounded-xl text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800 break-words leading-relaxed";
+      box.textContent = msg;
+    }
+
+    async function submitProfileUpdate() {
+      const nick = document.getElementById("acc-nickname-input").value.trim();
+      const curPw = document.getElementById("acc-current-pw").value;
+      const newPw = document.getElementById("acc-new-pw").value;
+      const fileInp = document.getElementById("acc-profile-file");
+
+      const fd = new FormData();
+      if (nick) fd.append("nickname", nick);
+      if (curPw) fd.append("current_password", curPw);
+      if (newPw) fd.append("new_password", newPw);
+      if (fileInp.files[0]) fd.append("profile_file", fileInp.files[0]);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/profile`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${authToken}` },
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          showAccountAlert(data.message || "수정 실패", true);
+          return;
+        }
+        currentUser = data.user;
+        updateAuthHeaderUI();
+        openAccountModal();
+        showAccountAlert(data.message, false);
+      } catch (e) {
+        showAccountAlert("서버 통신 오류", true);
+      }
+    }
+
+    async function submitDeleteAccount() {
+      const pw = document.getElementById("delete-confirm-pw").value;
+      if (!pw) {
+        showAccountAlert("비밀번호를 입력해 주세요.", true);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/account`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
+          body: JSON.stringify({ password: pw })
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          showAccountAlert(data.message || "탈퇴 실패", true);
+          return;
+        }
+        alert(data.message);
+        closeAccountModal();
+        authToken = null;
+        currentUser = null;
+        localStorage.removeItem("skinlogic_auth_token");
+        localStorage.removeItem("skinlogic_auto_login");
+        sessionStorage.removeItem("skinlogic_auth_token");
+        resetToCleanGuestState();
+        renderAllViews();
+      } catch (e) {
+        showAccountAlert("서버 통신 오류", true);
+      }
+    }
+
+    // =========================================================================
+    // [탭 전환 라우터]
+    // =========================================================================
+    function getRiskStyle(riskCode) {
+      if (riskCode === "HIGH_CAUTION") {
+        return { badge: "bg-rose-600 text-white", border: "border-rose-300 bg-rose-50/50" };
+      }
+      if (riskCode === "CAUTION") {
+        return { badge: "bg-amber-500 text-white", border: "border-amber-300 bg-amber-50/50" };
+      }
+      if (riskCode === "INSUFFICIENT") {
+        return { badge: "bg-slate-500 text-white", border: "border-slate-300 bg-slate-50" };
+      }
+      return { badge: "bg-emerald-600 text-white", border: "border-emerald-200 bg-emerald-50/40" };
+    }
+
+    function switchTab(tabName) {
+      if (tabName === "inner") tabName = "ai";
+      if (tabName !== "scan") {
+        stopWebCamera();
+      }
+
+      const tabs = ["home", "scan", "vanity", "ai", "archive"];
+      tabs.forEach(t => {
+        const content = document.getElementById(`tab-content-${t}`);
+        const pcBtn = document.getElementById(`tab-btn-${t}`);
+        const mobBtn = document.getElementById(`mob-tab-btn-${t}`);
+
+        if (t === tabName) {
+          content.classList.remove("hidden");
+          if (pcBtn) pcBtn.className = "px-3.5 py-2 rounded-xl text-xs lg:text-sm font-bold bg-teal-50 text-teal-700 transition whitespace-nowrap";
+          if (mobBtn) mobBtn.className = "relative flex flex-col items-center justify-center gap-0.5 text-teal-600 font-bold bg-teal-50/50";
+        } else {
+          content.classList.add("hidden");
+          if (pcBtn) pcBtn.className = "px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap";
+          if (mobBtn) mobBtn.className = "relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium";
+        }
+      });
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (tabName === "home") renderHomeDashboard();
+      if (tabName === "scan") {
+        if (scanSearchResultsCache.length === 0) {
+          searchCosmeticForScan(document.getElementById("scan-cosmetic-input").value);
+        } else {
+          renderScanSearchResultsList();
+        }
+      }
+      if (tabName === "vanity") loadCosmeticList();
+      if (tabName === "ai") renderAiRoutineEmptyOrResult();
+      if (tabName === "archive") renderArchiveList();
+    }
+
+    // =========================================================================
+    // [모바일 카메라 촬영 + OCR 화장품 자동 인식 고도화 + 확인/수정/수동 등록]
+    // =========================================================================
+    async function startWebCamera(preferredFacingMode = null) {
+      if (preferredFacingMode) {
+        currentCameraFacingMode = preferredFacingMode;
+      }
+
+      hideCameraErrorBox();
+      stopWebCamera();
+
+      const liveContainer = document.getElementById("camera-live-container");
+      const videoEl = document.getElementById("camera-video-el");
+      const badgeEl = document.getElementById("ocr-status-badge");
+      const streamLabel = document.getElementById("camera-stream-label");
+      const facingBadge = document.getElementById("camera-facing-badge");
+
+      const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+      if (!window.isSecureContext && !isLocalhost) {
+        showCameraFallbackError(
+          "HTTPS 보안 연결이 필요합니다",
+          "모바일 브라우저의 실시간 웹 카메라 미리보기는 HTTPS(보안 연결) 또는 localhost 환경에서만 허용됩니다. 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+        );
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showCameraFallbackError(
+          "현재 브라우저에서 실시간 카메라 API를 지원하지 않습니다",
+          "인앱 브라우저나 구형 브라우저에서는 실시간 미리보기가 제한될 수 있습니다. 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+        );
+        return;
+      }
+
+      badgeEl.textContent = "카메라 권한을 확인하고 미리보기를 준비 중입니다...";
+
+      const primaryConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: currentCameraFacingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      try {
+        try {
+          cameraMediaStream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+        } catch (firstErr) {
+          if (firstErr.name === "NotAllowedError" || firstErr.name === "PermissionDeniedError") {
+            throw firstErr;
+          }
+          cameraMediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+
+        videoEl.srcObject = cameraMediaStream;
+        await videoEl.play();
+
+        const isRear = currentCameraFacingMode === "environment";
+        streamLabel.textContent = isRear ? "📷 후면 카메라 작동 중" : "🤳 전면 카메라 작동 중";
+        facingBadge.textContent = isRear ? "후면 카메라 모드" : "전면 카메라 모드";
+
+        liveContainer.classList.remove("hidden");
+        badgeEl.textContent = "라벨이 잘 보이도록 맞춘 후 [📸 사진 찍기]를 누르면 자동으로 성분을 인식합니다.";
+      } catch (err) {
+        stopWebCamera();
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          showCameraFallbackError(
+            "카메라 접근 권한이 거부되었습니다",
+            "브라우저 주소창 왼쪽의 자물쇠(설정) 아이콘에서 '카메라' 권한을 [허용]으로 변경하거나, 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+          );
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          showCameraFallbackError(
+            "연결된 카메라 장치를 찾을 수 없습니다",
+            "현재 기기에 사용 가능한 카메라가 없거나 비활성화되어 있습니다. [갤러리에서 사진 선택]으로 라벨 이미지를 업로드해 주세요."
+          );
+        } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+          showCameraFallbackError(
+            "카메라가 다른 앱에서 사용 중입니다",
+            "다른 앱에서 카메라를 사용 중이어서 접근할 수 없습니다. 다른 카메라 앱을 종료하거나 아래 갤러리 사진 업로드를 이용해 주세요."
+          );
+        } else {
+          showCameraFallbackError(
+            "카메라를 시작할 수 없습니다",
+            `카메라 연결 중 오류가 발생했습니다(${err.name || "알 수 없는 오류"}). 아래 기본 카메라 촬영 또는 갤러리 사진 선택을 이용해 주세요.`
+          );
+        }
+      }
+    }
+
+    function switchCameraFacingMode() {
+      currentCameraFacingMode = (currentCameraFacingMode === "environment") ? "user" : "environment";
+      startWebCamera(currentCameraFacingMode);
+    }
+
+    function stopWebCamera() {
+      if (cameraMediaStream) {
+        cameraMediaStream.getTracks().forEach(track => track.stop());
+        cameraMediaStream = null;
+      }
+      const videoEl = document.getElementById("camera-video-el");
+      if (videoEl) {
+        videoEl.srcObject = null;
+      }
+      const liveContainer = document.getElementById("camera-live-container");
+      if (liveContainer) {
+        liveContainer.classList.add("hidden");
+      }
+    }
+
+    function showCameraFallbackError(title, message) {
+      const box = document.getElementById("camera-error-box");
+      document.getElementById("camera-error-title").textContent = `⚠️ ${title}`;
+      document.getElementById("camera-error-msg").textContent = message;
+      box.classList.remove("hidden");
+      document.getElementById("ocr-status-badge").textContent = "카메라 대신 갤러리 업로드 또는 수동 등록을 진행할 수 있습니다.";
+    }
+
+    function hideCameraErrorBox() {
+      document.getElementById("camera-error-box").classList.add("hidden");
+    }
+
+    function capturePhotoFromVideo() {
+      const videoEl = document.getElementById("camera-video-el");
+      const canvas = document.getElementById("camera-capture-canvas");
+
+      if (!videoEl || !cameraMediaStream) return;
+
+      const width = videoEl.videoWidth || 1280;
+      const height = videoEl.videoHeight || 720;
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(videoEl, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const fileName = `camera_label_${Date.now()}.jpg`;
+        const capturedFile = new File([blob], fileName, { type: "image/jpeg" });
+        stopWebCamera();
+        setOcrPhotoPreviewAndExtract(capturedFile, "📸 직접 촬영한 라벨 사진");
+      }, "image/jpeg", 0.92);
+    }
+
+    function handleOcrFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      stopWebCamera();
+      hideCameraErrorBox();
+      setOcrPhotoPreviewAndExtract(file, "🖼️ 선택한 사진 미리보기");
+      event.target.value = "";
+    }
+
+    async function setOcrPhotoPreviewAndExtract(fileObj, sourceTitle) {
+      if (pendingOcrPreviewUrl) {
+        URL.revokeObjectURL(pendingOcrPreviewUrl);
+      }
+      pendingOcrImageFile = fileObj;
+      pendingOcrPreviewUrl = URL.createObjectURL(fileObj);
+
+      document.getElementById("ocr-preview-source-badge").textContent = sourceTitle || "📸 사진 미리보기";
+      document.getElementById("ocr-preview-filename").textContent = fileObj.name;
+      document.getElementById("ocr-photo-preview-img").src = pendingOcrPreviewUrl;
+      document.getElementById("ocr-photo-preview-box").classList.remove("hidden");
+
+      await runOcrAutoExtraction(fileObj);
+    }
+
+    function retakeWebCameraPhoto() {
+      clearOcrPhotoPreview();
+      startWebCamera(currentCameraFacingMode);
+    }
+
+    function clearOcrPhotoPreview() {
+      if (pendingOcrPreviewUrl) {
+        URL.revokeObjectURL(pendingOcrPreviewUrl);
+        pendingOcrPreviewUrl = null;
+      }
+      pendingOcrImageFile = null;
+      const previewBox = document.getElementById("ocr-photo-preview-box");
+      if (previewBox) previewBox.classList.add("hidden");
+      const previewImg = document.getElementById("ocr-photo-preview-img");
+      if (previewImg) previewImg.src = "";
+      const badge = document.getElementById("ocr-status-badge");
+      if (badge) badge.textContent = "사진을 촬영/선택하면 브랜드·제품명·전성분·제형이 자동 추출됩니다.";
+    }
+
+    function resetOcrFormFields() {
+      document.getElementById("ocr-matched-product-id").value = "0";
+      document.getElementById("ocr-brand-input").value = "";
+      document.getElementById("ocr-name-input").value = "";
+      document.getElementById("ocr-type-select").value = "AUTO";
+      document.getElementById("ocr-ingredients-input").value = "";
+      lastOcrExtractedProduct = null;
+
+      const modeBadge = document.getElementById("ocr-recognition-mode-badge");
+      modeBadge.className = "px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold";
+      modeBadge.textContent = "사진 대기 / 수동 입력 가능";
+
+      const matchBanner = document.getElementById("ocr-match-banner");
+      matchBanner.classList.add("hidden");
+      matchBanner.innerHTML = "";
+    }
+
+    function onOcrFieldManualEdit() {
+      const matchedIdEl = document.getElementById("ocr-matched-product-id");
+      if (matchedIdEl.value !== "0" && lastOcrExtractedProduct) {
+        const curBrand = document.getElementById("ocr-brand-input").value.trim();
+        const curName = document.getElementById("ocr-name-input").value.trim();
+        if (curBrand !== lastOcrExtractedProduct.brand || curName !== lastOcrExtractedProduct.name) {
+          matchedIdEl.value = "0";
+        }
+      }
+    }
+
+    async function runOcrAutoExtraction(file) {
+      const brandInput = document.getElementById("ocr-brand-input");
+      const nameInput = document.getElementById("ocr-name-input");
+      const typeSelect = document.getElementById("ocr-type-select");
+      const ingInput = document.getElementById("ocr-ingredients-input");
+      const matchedIdInput = document.getElementById("ocr-matched-product-id");
+      const modeBadge = document.getElementById("ocr-recognition-mode-badge");
+      const matchBanner = document.getElementById("ocr-match-banner");
+      const badge = document.getElementById("ocr-status-badge");
+
+      badge.textContent = `⏳ '${file.name}'에서 브랜드·제품명·제형·전성분을 자동 인식 중입니다...`;
+      modeBadge.className = "px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold";
+      modeBadge.textContent = "⏳ OCR 자동 추출 중...";
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("brand", brandInput.value.trim());
+      formData.append("product_name", nameInput.value.trim());
+      formData.append("item_type_hint", typeSelect.value);
+      formData.append("action", "EXTRACT");
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/ocr/analyze-image`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.ocr_recognized === false || data.fallback_manual) {
+          matchedIdInput.value = "0";
+          modeBadge.className = "px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold";
+          modeBadge.textContent = "⚠️ 자동 인식 실패 · 수동 등록 모드";
+
+          matchBanner.classList.remove("hidden");
+          matchBanner.className = "p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed";
+          matchBanner.innerHTML = `<b>⚠️ 자동 인식 안내:</b> ${data.message || "라벨 글씨를 인식하지 못했습니다."} 아래 입력칸에 브랜드·제품명·전성분을 직접 입력해 수동으로 등록하실 수 있습니다.`;
+
+          badge.textContent = "인식 실패: 아래 입력란에 수동으로 정보를 입력한 뒤 등록 버튼을 눌러주세요.";
+          nameInput.focus();
+          return;
+        }
+
+        const prod = data.product || {};
+        lastOcrExtractedProduct = prod;
+
+        brandInput.value = prod.brand || "";
+        nameInput.value = prod.name || "";
+        matchedIdInput.value = String(prod.product_id || 0);
+
+        if (prod.item_type) {
+          const optExists = Array.from(typeSelect.options).some(o => o.value === prod.item_type);
+          if (optExists) {
+            typeSelect.value = prod.item_type;
+          } else if (prod.item_type.includes("오일") || prod.item_type.includes("밤")) {
+            typeSelect.value = "클렌징 오일";
+          } else if (prod.item_type.includes("선세럼") || prod.item_type.includes("선젤")) {
+            typeSelect.value = "선세럼/선젤/플루이드";
+          } else if (prod.item_type.includes("시트") || prod.item_type.includes("팩")) {
+            typeSelect.value = "시트마스크";
+          }
+        }
+
+        const rawIngStr = prod.raw_ingredients_text || (prod.active_ingredients || []).join(", ");
+        ingInput.value = rawIngStr;
+
+        if (data.db_matched && prod.product_id > 0) {
+          modeBadge.className = "px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold";
+          modeBadge.textContent = `✓ 기존 DB 일치 제품 (#${prod.product_id})`;
+
+          matchBanner.classList.remove("hidden");
+          matchBanner.className = "p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs leading-relaxed";
+          matchBanner.innerHTML = `<b>✓ 기존 DB 매칭 완료:</b> DB에 등록된 <b>[${prod.brand}] ${prod.name}</b> 제품과 일치하여 전성분 및 제형 정보를 자동으로 불러왔습니다. 확인 후 아래 등록 버튼을 눌러주세요.`;
+        } else {
+          modeBadge.className = "px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold";
+          modeBadge.textContent = "✨ 신규 제품 OCR 추출 완료";
+
+          matchBanner.classList.remove("hidden");
+          matchBanner.className = "p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-xs leading-relaxed";
+          matchBanner.innerHTML = `<b>✨ OCR 자동 추출 완료:</b> 추출된 브랜드·제품명·제형·전성분을 확인하고 필요 시 수정한 뒤 아래 <b>[확인 완료 · 분석 목록 및 DB 등록]</b>을 눌러주세요.`;
+        }
+
+        badge.textContent = "추출 결과를 확인·수정한 뒤 [확인 완료 · 분석 목록 및 DB 등록] 버튼을 눌러주세요.";
+      } catch (err) {
+        matchedIdInput.value = "0";
+        modeBadge.className = "px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold";
+        modeBadge.textContent = "수동 입력 모드";
+        badge.textContent = "서버 연결을 확인하거나 수동으로 정보를 입력해 등록해 주세요.";
+      }
+    }
+
+    async function confirmAndSaveOcrProduct() {
+      const brandInput = document.getElementById("ocr-brand-input");
+      const nameInput = document.getElementById("ocr-name-input");
+      const typeSelect = document.getElementById("ocr-type-select");
+      const ingInput = document.getElementById("ocr-ingredients-input");
+      const matchedIdInput = document.getElementById("ocr-matched-product-id");
+      const autoVanityCheck = document.getElementById("ocr-auto-vanity-check");
+      const badge = document.getElementById("ocr-status-badge");
+      const dbResultBox = document.getElementById("ocr-db-result-box");
+      const saveBtn = document.getElementById("btn-confirm-ocr-save");
+
+      const brandVal = brandInput.value.trim() || "사용자 직접 등록";
+      const nameVal = nameInput.value.trim();
+      const typeVal = typeSelect.value;
+      const ingVal = ingInput.value.trim();
+      const matchedPid = parseInt(matchedIdInput.value || "0", 10);
+
+      if (!nameVal) {
+        alert("제품명을 입력하거나 확인해 주세요.");
+        nameInput.focus();
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "⏳ 제품 등록 및 성분 매칭 중...";
+
+      const formData = new FormData();
+      formData.append("action", "SAVE");
+      formData.append("brand", brandVal);
+      formData.append("product_name", nameVal);
+      formData.append("item_type_hint", typeVal);
+      formData.append("raw_ingredients_override", ingVal);
+      formData.append("matched_product_id", String(matchedPid));
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/ocr/analyze-image`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          alert(data.message || "제품 등록 중 오류가 발생했습니다.");
+          return;
+        }
+
+        const prod = data.product || {};
+        const extracted = prod.active_ingredients || data.matched_active_ingredients || ["히알루론산", "판테놀"];
+
+        const scanAddedResult = addOrReplaceScanProduct({
+          id: String(prod.product_id || Date.now()),
+          name: `[${prod.brand}] ${prod.name}`,
+          brand: prod.brand,
+          item_type: prod.item_type,
+          ingredients: extracted,
+          raw_ingredients_text: prod.raw_ingredients_text || ""
+        });
+
+        let vanityStatusMsg = "내 화장대 미등록(선택 해제)";
+        if (autoVanityCheck.checked && prod.product_id) {
+          const isNewInVanity = addToVanityBasket(prod);
+          vanityStatusMsg = isNewInVanity ? "내 화장대 신규 등록 완료" : "내 화장대에 이미 보유 중 (중복 방지·최신 정보 갱신)";
+        }
+
+        loadCosmeticList();
+        searchCosmeticForScan(document.getElementById("scan-cosmetic-input").value);
+
+        const actionLabel = data.db_action === "DB_MATCHED"
+          ? `기존 DB 일치 제품 연동 (#${prod.product_id})`
+          : (data.db_action === "UPDATED" ? `기존 등록 제품 갱신 (#${prod.product_id})` : `신규 DB 등록 완료 (#${prod.product_id})`);
+
+        dbResultBox.classList.remove("hidden");
+        dbResultBox.innerHTML = `
+          <div class="space-y-1">
+            <div><b>✓ ${actionLabel}:</b> [${prod.brand}] ${prod.name} (${prod.item_type})</div>
+            <div class="text-emerald-700"><b>주요 성분:</b> ${extracted.join(", ")}</div>
+            <div class="text-[11px] text-slate-600">• 분석 목록: ${scanAddedResult} / • 화장대: ${vanityStatusMsg}</div>
+          </div>`;
+
+        badge.textContent = `[${prod.brand}] ${prod.name} 등록 완료`;
+        clearOcrPhotoPreview();
+        resetOcrFormFields();
+      } catch (err) {
+        badge.textContent = "서버 연결을 확인해 주세요.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "✓ 확인 완료 · 분석 목록 및 DB 등록";
+      }
+    }
+
+    // =========================================================================
+    // [MENU 2: 라벨 스캔 제품 관리 & 다중 검색 리스트 (동일 제형 교체/추가 동시 제공)]
+    // =========================================================================
+    function normalizeProductKey(brand, name) {
+      return `${(brand || "").trim()}_${(name || "").replace(/^\[.*?\]\s*/, "").trim()}`.toLowerCase().replace(/\s+/g, "");
+    }
+
+    function addOrReplaceScanProduct(prodObj, forceReplaceIndex = null) {
+      if (isDummyProduct(prodObj)) return "테스트 데이터 제외됨";
+
+      const newEntry = {
+        id: String(prodObj.id || prodObj.product_id || `P_${Date.now()}`),
+        name: prodObj.name.startsWith("[") ? prodObj.name : `[${prodObj.brand || "브랜드"}] ${prodObj.name}`,
+        brand: prodObj.brand || "",
+        item_type: prodObj.item_type || "스킨케어",
+        ingredients: prodObj.ingredients || prodObj.active_ingredients || [],
+        raw_ingredients_text: prodObj.raw_ingredients_text || ""
+      };
+
+      let resultStatus = "신규 추가됨";
+      const activeReplaceIdx = forceReplaceIndex !== null ? forceReplaceIndex : replaceTargetIndex;
+
+      if (activeReplaceIdx !== null && activeReplaceIdx >= 0 && activeReplaceIdx < scanProductList.length) {
+        scanProductList[activeReplaceIdx] = newEntry;
+        replaceTargetIndex = null;
+        document.getElementById("replace-mode-indicator").classList.add("hidden");
+        resultStatus = "교체 완료";
+      } else {
+        const targetKey = normalizeProductKey(newEntry.brand, newEntry.name);
+        const dupIdx = scanProductList.findIndex(p =>
+          String(p.id) === String(newEntry.id) ||
+          normalizeProductKey(p.brand, p.name) === targetKey
+        );
+        if (dupIdx >= 0) {
+          scanProductList[dupIdx] = newEntry;
+          resultStatus = "이미 목록에 있어 최신 정보로 갱신됨(중복 방지)";
+        } else {
+          scanProductList.push(newEntry);
+        }
+      }
+      renderScanProductList();
+      renderScanSearchResultsList();
+      runTab1MultiAnalysis();
+      syncUserStateToServer();
+      return resultStatus;
+    }
+
+    function startReplaceScanProduct(idx) {
+      replaceTargetIndex = idx;
+      document.getElementById("replace-mode-indicator").classList.remove("hidden");
+      renderScanProductList();
+      renderScanSearchResultsList();
+      document.getElementById("scan-cosmetic-input").focus();
+    }
+
+    function cancelReplaceMode() {
+      replaceTargetIndex = null;
+      document.getElementById("replace-mode-indicator").classList.add("hidden");
+      renderScanProductList();
+      renderScanSearchResultsList();
+    }
+
+    function removeScanProduct(idx) {
+      if (replaceTargetIndex === idx) cancelReplaceMode();
+      scanProductList.splice(idx, 1);
+      renderScanProductList();
+      renderScanSearchResultsList();
+      runTab1MultiAnalysis();
+      syncUserStateToServer();
+    }
+
+    function clearScanProductList() {
+      cancelReplaceMode();
+      scanProductList = [];
+      renderScanProductList();
+      renderScanSearchResultsList();
+      runTab1MultiAnalysis();
+      syncUserStateToServer();
+    }
+
+    function renderScanProductList() {
+      const container = document.getElementById("scan-selected-products-list");
+      const cnt = scanProductList.length;
+      document.getElementById("scan-list-count").textContent = cnt;
+      document.getElementById("scan-count-badge").textContent = cnt;
+      const mobBadge = document.getElementById("mob-scan-count-badge");
+      if (mobBadge) mobBadge.textContent = cnt;
+
+      if (cnt === 0) {
+        container.innerHTML = `<div class="col-span-full p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-400">선택된 화장품이 없습니다. (2개 이상 추가 시 상극 분석)</div>`;
+        return;
+      }
+
+      container.innerHTML = scanProductList.map((p, idx) => {
+        const labelChar = String.fromCharCode(65 + idx);
+        const isReplacing = replaceTargetIndex === idx;
+        const borderCls = isReplacing ? "border-amber-400 bg-amber-50/70" : "border-slate-200 bg-slate-50";
+        return `
+          <div class="p-3 rounded-xl border ${borderCls} flex flex-col justify-between gap-2 min-w-0">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-md bg-teal-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">${labelChar}</span>
+                <span class="text-xs font-bold text-slate-800 truncate">${p.name}</span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-1 line-clamp-1">${p.item_type ? `[${p.item_type}] ` : ""}${(p.ingredients || []).join(", ")}</div>
+            </div>
+            <div class="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-200/60">
+              <button onclick="startReplaceScanProduct(${idx})" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-100">
+                ${isReplacing ? "교체 대기중" : "🔄 교체"}
+              </button>
+              <button onclick="removeScanProduct(${idx})" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-rose-500 hover:bg-rose-50">
+                ✕ 삭제
+              </button>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    async function searchCosmeticForScan(query) {
+      const countLabel = document.getElementById("scan-search-count-label");
+      const listEl = document.getElementById("scan-cosmetic-results-list");
+      let url = `${API_BASE}/api/cosmetics/search?limit=15`;
+      if (query && query.trim().length > 0) {
+        url += `&q=${encodeURIComponent(query.trim())}`;
+      }
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        scanSearchResultsCache = (data.items || []).filter(item => !isDummyProduct(item));
+        if (countLabel) {
+          countLabel.textContent = `${scanSearchResultsCache.length}개 표시됨`;
+        }
+        renderScanSearchResultsList();
+      } catch (e) {
+        if (listEl) {
+          listEl.innerHTML = `<div class="col-span-full p-3 text-xs text-rose-500">서버 연결을 확인해 주세요.</div>`;
+        }
+      }
+    }
+
+    function renderScanSearchResultsList() {
+      const listEl = document.getElementById("scan-cosmetic-results-list");
+      if (!listEl) return;
+
+      if (!scanSearchResultsCache || scanSearchResultsCache.length === 0) {
+        listEl.innerHTML = `<div class="col-span-full p-4 text-center text-xs text-slate-400">일치하는 화장품이 없습니다.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = scanSearchResultsCache.map(item => {
+        const ings = (item.active_ingredients && item.active_ingredients.length > 0)
+          ? item.active_ingredients
+          : (item.sample_ingredients ? item.sample_ingredients.split(",").map(s => s.trim()) : []);
+        const itemPayload = {
+          id: String(item.product_id),
+          name: `[${item.brand}] ${item.name}`,
+          brand: item.brand,
+          item_type: item.item_type,
+          ingredients: ings,
+          raw_ingredients_text: item.raw_ingredients_text || ""
+        };
+        const jsonStr = JSON.stringify(itemPayload).replace(/'/g, "&apos;");
+
+        const sameTypeIdx = scanProductList.findIndex(p => p.item_type && item.item_type && p.item_type === item.item_type);
+        const targetReplaceIdx = replaceTargetIndex !== null ? replaceTargetIndex : sameTypeIdx;
+
+        let actionBtnsHtml = "";
+        if (targetReplaceIdx >= 0) {
+          actionBtnsHtml = `
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick='addOrReplaceScanProduct(${jsonStr}, ${targetReplaceIdx})' class="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-200 text-[11px] font-bold transition">
+                🔄 교체
+              </button>
+              <button type="button" onclick='addOrReplaceScanProduct(${jsonStr}, -1)' class="px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 text-[11px] font-bold transition">
+                + 추가
+              </button>
+            </div>`;
+        } else {
+          actionBtnsHtml = `
+            <button type="button" onclick='addOrReplaceScanProduct(${jsonStr}, -1)' class="shrink-0 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 text-[11px] font-bold transition">
+              + 추가
+            </button>`;
+        }
+
+        return `
+          <div class="p-2.5 rounded-xl bg-white border border-slate-200/90 flex items-center justify-between gap-2 min-w-0 hover:border-teal-300 transition">
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-slate-800 truncate">[${item.brand}] ${item.name}</div>
+              <div class="text-[11px] text-slate-400 truncate mt-0.5">${item.item_type} · ${ings.join(", ") || item.sample_ingredients}</div>
+            </div>
+            ${actionBtnsHtml}
+          </div>`;
+      }).join("");
+    }
+
+    async function runTab1MultiAnalysis() {
+      const panel = document.getElementById("scan-result-panel");
+      if (scanProductList.length < 2) {
+        panel.innerHTML = `
+          <div class="h-full min-h-[360px] flex flex-col items-center justify-center text-center p-6 text-slate-400 text-xs leading-relaxed">
+            좌측에서 카메라로 라벨을 촬영하거나 화장품을 2개 이상 추가하면<br/>교차 상극 분석 결과가 표시됩니다.
+          </div>`;
+        return;
+      }
+
+      const payload = {
+        products: scanProductList.map((p, idx) => ({ id: String.fromCharCode(65 + idx), name: p.name, brand: p.brand || "", item_type: p.item_type || "스킨케어", category: "cosmetic", ingredients: p.ingredients || [], raw_ingredients_text: p.raw_ingredients_text || "" })),
+        supplements: [],
+        uv_index: currentWeatherObj.uv_index
+      };
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/analyze/multi`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+          renderMultiAnalysisReport(panel, data, "scan");
+          const detailSummaryHtml = data.pairwise_results.map(pr =>
+            `<div>• <b>${pr.product_a_name} + ${pr.product_b_name}:</b> [${pr.risk_display}] ${pr.short_desc}</div>`
+          ).join("");
+          saveToArchive("라벨 상극 분석", `${data.total_products_count}개 제품 교차 비교`, `종합 위험도: ${data.overall_risk}`, detailSummaryHtml);
+        }
+      } catch (err) {
+        panel.innerHTML = `<div class="p-6 text-xs text-rose-600 font-bold">서버 연결을 확인해 주세요.</div>`;
+      }
+    }
+
+    function renderMultiAnalysisReport(container, data, modePrefix) {
+      const overallStyle = getRiskStyle(data.overall_risk_code);
+      const dupHtml = (data.duplicate_ingredients_summary && data.duplicate_ingredients_summary.length > 0)
+        ? data.duplicate_ingredients_summary.map(d => `<span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">'${d.ingredient}' ${d.count}개 제품 중복</span>`).join(" ")
+        : `<span class="text-xs text-slate-400">중복 성분 없음</span>`;
+
+      const pairsRowsHtml = data.pairwise_results.map((pair, idx) => {
+        const st = getRiskStyle(pair.risk_code);
+        const detailId = `${modePrefix}-pair-detail-pc-${idx}`;
+        return `
+          <tr onclick="togglePairDetail('${detailId}')" class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+            <td class="py-3 px-3.5 font-bold text-xs text-slate-800">${pair.pair_label} (${pair.product_a_name} + ${pair.product_b_name})</td>
+            <td class="py-3 px-3.5 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[11px] font-bold ${st.badge}">${pair.risk_display}</span></td>
+            <td class="py-3 px-3.5 text-xs text-slate-600">${pair.short_desc} <span class="text-teal-600 font-bold ml-1">근거 ▾</span></td>
+          </tr>
+          <tr id="${detailId}" class="hidden bg-slate-50 border-b border-slate-200">
+            <td colspan="3" class="p-4 text-xs space-y-1.5 text-slate-700 leading-relaxed">
+              <div><b>• 원인 성분:</b> ${(pair.causative_ingredients && pair.causative_ingredients.length > 0) ? pair.causative_ingredients.join(", ") : "없음"}</div>
+              <div><b>• 분석 근거:</b> ${pair.rationale}</div>
+              <div><b>• 권장 사용법:</b> ${pair.recommended_usage} (${pair.am_pm_split})</div>
+            </td>
+          </tr>`;
+      }).join("");
+
+      const mobileCardsHtml = data.pairwise_results.map((pair, idx) => {
+        const st = getRiskStyle(pair.risk_code);
+        const detailId = `${modePrefix}-pair-detail-mob-${idx}`;
+        return `
+          <div class="rounded-xl border ${st.border} p-3.5 space-y-2">
+            <div onclick="togglePairDetail('${detailId}')" class="flex items-start justify-between gap-2 cursor-pointer">
+              <div class="space-y-1 min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${st.badge}">${pair.risk_display}</span>
+                  <span class="text-xs font-extrabold text-teal-800">${pair.pair_label}</span>
+                </div>
+                <div class="text-xs font-bold text-slate-900 break-words">${pair.product_a_name} + ${pair.product_b_name}</div>
+              </div>
+              <span class="text-xs text-teal-700 font-bold shrink-0">근거 ▾</span>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">${pair.short_desc}</p>
+            <div id="${detailId}" class="hidden pt-2.5 border-t border-slate-200/80 text-xs space-y-1.5 text-slate-700 leading-relaxed">
+              <div><b>• 원인 성분:</b> ${(pair.causative_ingredients && pair.causative_ingredients.length > 0) ? pair.causative_ingredients.join(", ") : "없음"}</div>
+              <div><b>• 분석 근거:</b> ${pair.rationale}</div>
+              <div><b>• 권장 사용법:</b> ${pair.recommended_usage} (${pair.am_pm_split})</div>
+            </div>
+          </div>`;
+      }).join("");
+
+      container.innerHTML = `
+        <div class="space-y-4 text-left">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">제품 간 교차 상극 분석 결과</h3>
+            <span class="px-3 py-1 rounded-lg text-xs font-bold ${overallStyle.badge}">종합 판정: ${data.overall_risk}</span>
+          </div>
+
+          <div class="hidden sm:block rounded-xl border border-slate-200 overflow-hidden">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-100 text-xs font-bold text-slate-600 border-b border-slate-200">
+                  <th class="py-2.5 px-3.5">비교 조합</th>
+                  <th class="py-2.5 px-3.5">위험도</th>
+                  <th class="py-2.5 px-3.5">설명 (클릭 시 상세)</th>
+                </tr>
+              </thead>
+              <tbody>${pairsRowsHtml}</tbody>
+            </table>
+          </div>
+
+          <div class="sm:hidden space-y-2.5">
+            ${mobileCardsHtml}
+          </div>
+
+          <div class="pt-1">
+            <div class="text-xs font-bold text-slate-700 mb-1.5">중복 포함 성분</div>
+            <div class="flex flex-wrap gap-1.5">${dupHtml}</div>
+          </div>
+        </div>`;
+    }
+
+    function togglePairDetail(rowId) {
+      const el = document.getElementById(rowId);
+      if (el) el.classList.toggle("hidden");
+    }
+
+    // =========================================================================
+    // [MENU 3: 내 화장대 로직]
+    // =========================================================================
+    function filterCosmeticCategory(cat) {
+      selectedCosmeticCategory = cat;
+      ["", "Skincare", "Cleansing", "MaskPack", "SunCare"].forEach(c => {
+        const btn = document.getElementById(`cat-btn-${c === "" ? "all" : c}`);
+        btn.className = (c === cat)
+          ? "px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 text-white transition"
+          : "px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+      });
+      loadCosmeticList();
+    }
+
+    async function loadCosmeticList() {
+      const q = document.getElementById("routine-cosmetic-search").value.trim();
+      const listEl = document.getElementById("routine-cosmetic-list");
+      let url = `${API_BASE}/api/cosmetics/search?limit=25`;
+      if (q) url += `&q=${encodeURIComponent(q)}`;
+      if (selectedCosmeticCategory) url += `&category=${encodeURIComponent(selectedCosmeticCategory)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const filteredItems = (data.items || []).filter(item => !isDummyProduct(item));
+        if (filteredItems.length === 0) {
+          listEl.innerHTML = `<div class="col-span-full p-4 text-center text-xs text-slate-400">일치하는 화장품이 없습니다.</div>`;
+          return;
+        }
+        listEl.innerHTML = filteredItems.map(item => {
+          const isAlreadyOwned = vanityBasket.some(v =>
+            (v.product_id && item.product_id && Number(v.product_id) === Number(item.product_id)) ||
+            normalizeProductKey(v.brand, v.name) === normalizeProductKey(item.brand, item.name)
+          );
+          const sameTypeIdx = vanityBasket.findIndex(v => v.item_type && item.item_type && v.item_type === item.item_type);
+          const targetReplaceIdx = vanityReplaceTargetIndex !== null ? vanityReplaceTargetIndex : sameTypeIdx;
+          const jsonStr = JSON.stringify(item).replace(/'/g, "&apos;");
+
+          let btnGroupHtml = "";
+          if (isAlreadyOwned) {
+            btnGroupHtml = `<button disabled class="w-full py-1.5 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold">✓ 보유 중</button>`;
+          } else if (targetReplaceIdx >= 0) {
+            btnGroupHtml = `
+              <div class="grid grid-cols-2 gap-1.5">
+                <button onclick='addToVanityBasket(${jsonStr}, ${targetReplaceIdx})' class="py-1.5 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-200 text-[11px] font-bold transition">
+                  🔄 교체
+                </button>
+                <button onclick='addToVanityBasket(${jsonStr}, -1)' class="py-1.5 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 text-[11px] font-bold transition">
+                  + 추가
+                </button>
+              </div>`;
+          } else {
+            btnGroupHtml = `
+              <button onclick='addToVanityBasket(${jsonStr}, -1)' class="w-full py-1.5 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white text-xs font-bold transition">
+                + 화장대 추가
+              </button>`;
+          }
+
+          return `
+            <div class="p-2.5 rounded-xl bg-white border border-slate-200/80 flex flex-col justify-between gap-2 min-w-0 hover:border-teal-300 transition">
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-800 line-clamp-1">[${item.brand}] ${item.name}</div>
+                <div class="text-[11px] text-slate-400 line-clamp-1 mt-0.5">${item.item_type} · ${(item.active_ingredients || []).join(", ") || item.sample_ingredients}</div>
+              </div>
+              ${btnGroupHtml}
+            </div>`;
+        }).join("");
+      } catch (e) {
+        listEl.innerHTML = `<div class="col-span-full p-3 text-xs text-rose-500">서버 연결을 확인해 주세요.</div>`;
+      }
+    }
+
+    function startVanityReplaceProduct(idx, event) {
+      if (event) event.stopPropagation();
+      vanityReplaceTargetIndex = idx;
+      const targetItem = vanityBasket[idx];
+      document.getElementById("vanity-replace-indicator").classList.remove("hidden");
+      if (targetItem && targetItem.item_type) {
+        document.getElementById("routine-cosmetic-search").value = targetItem.item_type.split("/")[0];
+      }
+      renderVanityBasket();
+      loadCosmeticList();
+    }
+
+    function cancelVanityReplaceMode() {
+      vanityReplaceTargetIndex = null;
+      document.getElementById("vanity-replace-indicator").classList.add("hidden");
+      renderVanityBasket();
+      loadCosmeticList();
+    }
+
+    function addToVanityBasket(item, forceReplaceIdx = null) {
+      if (isDummyProduct(item)) return false;
+
+      const activeReplaceIdx = forceReplaceIdx !== null ? forceReplaceIdx : vanityReplaceTargetIndex;
+      let isNewlyAdded = false;
+
+      if (activeReplaceIdx !== null && activeReplaceIdx >= 0 && activeReplaceIdx < vanityBasket.length) {
+        vanityBasket[activeReplaceIdx] = item;
+        vanityReplaceTargetIndex = null;
+        document.getElementById("vanity-replace-indicator").classList.add("hidden");
+        isNewlyAdded = true;
+      } else {
+        const targetKey = normalizeProductKey(item.brand, item.name);
+        const existingIdx = vanityBasket.findIndex(p =>
+          (p.product_id && item.product_id && Number(p.product_id) === Number(item.product_id)) ||
+          normalizeProductKey(p.brand, p.name) === targetKey
+        );
+        if (existingIdx >= 0) {
+          vanityBasket[existingIdx] = item;
+          isNewlyAdded = false;
+        } else {
+          vanityBasket.push(item);
+          isNewlyAdded = true;
+        }
+      }
+
+      renderVanityBasket();
+      loadCosmeticList();
+      runVanityAutoConflictAnalysis();
+      if (lastRoutineApiData) runTab2AiRoutine();
+      syncUserStateToServer();
+      return isNewlyAdded;
+    }
+
+    function removeFromVanityBasket(id, event) {
+      if (event) event.stopPropagation();
+      vanityBasket = vanityBasket.filter(p => p.product_id !== id);
+      vanityReplaceTargetIndex = null;
+      document.getElementById("vanity-replace-indicator").classList.add("hidden");
+      if (vanitySelectedFilterId === String(id)) vanitySelectedFilterId = null;
+      renderVanityBasket();
+      loadCosmeticList();
+      runVanityAutoConflictAnalysis();
+      if (lastRoutineApiData) runTab2AiRoutine();
+      syncUserStateToServer();
+    }
+
+    function clearVanityBasket() {
+      vanityBasket = [];
+      vanityReplaceTargetIndex = null;
+      vanitySelectedFilterId = null;
+      document.getElementById("vanity-replace-indicator").classList.add("hidden");
+      renderVanityBasket();
+      loadCosmeticList();
+      runVanityAutoConflictAnalysis();
+      syncUserStateToServer();
+    }
+
+    function selectVanityProductFilter(prodId) {
+      const target = String(prodId);
+      vanitySelectedFilterId = (vanitySelectedFilterId === target) ? null : target;
+      renderVanityBasket();
+      if (vanityConflictCache) renderVanityConflictPanel(vanityConflictCache);
+    }
+
+    function renderVanityBasket() {
+      const container = document.getElementById("vanity-basket-chips");
+      const cnt = vanityBasket.length;
+      document.getElementById("vanity-count-badge").textContent = cnt;
+      const mobBadge = document.getElementById("mob-vanity-count-badge");
+      if (mobBadge) mobBadge.textContent = cnt;
+
+      if (cnt === 0) {
+        container.innerHTML = `<div class="col-span-full p-4 text-xs text-slate-400 text-center bg-slate-50 rounded-xl">등록된 화장품이 없습니다.</div>`;
+        return;
+      }
+      container.innerHTML = vanityBasket.map((item, idx) => {
+        const isSelected = vanitySelectedFilterId === String(item.product_id);
+        const isReplacing = vanityReplaceTargetIndex === idx;
+        const cls = isSelected
+          ? "bg-teal-600 text-white border-teal-700"
+          : (isReplacing ? "bg-amber-50 text-amber-950 border-amber-400" : "bg-slate-50 text-slate-800 border-slate-200 hover:border-teal-300");
+        return `
+          <div onclick="selectVanityProductFilter('${item.product_id}')" class="flex items-center justify-between px-3 py-2.5 rounded-xl border ${cls} text-xs cursor-pointer transition min-w-0 gap-1.5">
+            <span class="truncate font-semibold">${String.fromCharCode(65 + idx)}. [${item.item_type}] ${item.brand} - ${item.name}</span>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="startVanityReplaceProduct(${idx}, event)" title="다른 제품으로 교체" class="${isSelected ? 'text-teal-100 hover:text-white' : 'text-slate-500 hover:text-amber-700'} text-[11px] font-bold px-1">🔄</button>
+              <button onclick="removeFromVanityBasket(${item.product_id}, event)" title="삭제" class="${isSelected ? 'text-white' : 'text-slate-400 hover:text-rose-600'} font-bold px-1">✕</button>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    async function runVanityAutoConflictAnalysis() {
+      const panel = document.getElementById("vanity-auto-conflict-panel");
+      if (vanityBasket.length === 0) {
+        vanityConflictCache = null;
+        renderHomeDashboard();
+        panel.innerHTML = `
+          <div class="h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl font-black">🧴</div>
+            <div class="text-sm sm:text-base font-extrabold text-slate-800">내 화장대가 아직 비어 있습니다</div>
+            <p class="text-xs text-slate-500 max-w-md leading-relaxed">
+              좌측에서 현재 사용 중인 화장품을 검색해 <b>[+ 화장대 추가]</b>로 등록하거나,<br/>
+              <b>[라벨 스캔]</b> 탭에서 화장품 라벨을 촬영하면 내 화장대에 자동으로 연동됩니다.
+            </p>
+            <button onclick="switchTab('scan')" class="mt-1 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">
+              📷 라벨 스캔으로 바로 등록하기 →
+            </button>
+          </div>`;
+        return;
+      }
+      if (vanityBasket.length === 1) {
+        vanityConflictCache = null;
+        renderHomeDashboard();
+        const single = vanityBasket[0];
+        panel.innerHTML = `
+          <div class="h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 space-y-2.5">
+            <span class="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-bold">현재 1종 보유 중</span>
+            <div class="text-sm font-extrabold text-slate-800">[${single.brand}] ${single.name}</div>
+            <p class="text-xs text-slate-500 max-w-md leading-relaxed">
+              제품을 <b>1개 이상 더 추가</b>하시면 보유 화장품 간 성분 상극 여부와<br/>아침(AM) · 저녁(PM) 사용 시간대 구분표가 자동으로 분석됩니다.
+            </p>
+          </div>`;
+        return;
+      }
+      const payload = {
+        products: vanityBasket.map(p => ({ id: String(p.product_id), name: `[${p.brand}] ${p.name}`, brand: p.brand || "", item_type: p.item_type || "스킨케어", category: "cosmetic", ingredients: p.active_ingredients || [], raw_ingredients_text: p.raw_ingredients_text || "" })),
+        supplements: [],
+        uv_index: currentWeatherObj.uv_index
+      };
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/analyze/multi`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+          vanityConflictCache = data;
+          renderVanityConflictPanel(data);
+          renderHomeDashboard();
+        }
+      } catch (e) {}
+    }
+
+    function renderVanityConflictPanel(data) {
+      const panel = document.getElementById("vanity-auto-conflict-panel");
+      const overallStyle = getRiskStyle(data.overall_risk_code);
+      let pairs = data.pairwise_results || [];
+      if (vanitySelectedFilterId) {
+        pairs = pairs.filter(p => String(p.product_a_id) === vanitySelectedFilterId || String(p.product_b_id) === vanitySelectedFilterId);
+      }
+      const pairListHtml = pairs.map((pair, idx) => {
+        const st = getRiskStyle(pair.risk_code);
+        const detailId = `vanity-pair-detail-${idx}`;
+        return `
+          <div class="rounded-xl border ${st.border} p-3.5">
+            <div onclick="togglePairDetail('${detailId}')" class="flex items-start sm:items-center justify-between gap-2 cursor-pointer">
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${st.badge} shrink-0">${pair.risk_display}</span>
+                <span class="text-xs font-bold text-slate-800 break-words">${pair.product_a_name} + ${pair.product_b_name}</span>
+              </div>
+              <span class="text-xs text-teal-700 font-bold shrink-0">근거 ▾</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">${pair.short_desc}</p>
+            <div id="${detailId}" class="hidden mt-2.5 pt-2.5 border-t border-slate-200/80 text-xs space-y-1.5 text-slate-700 leading-relaxed">
+              <div><b>• 원인 성분:</b> ${(pair.causative_ingredients || []).join(", ") || "없음"}</div>
+              <div><b>• 분석 근거:</b> ${pair.rationale}</div>
+              <div><b>• 권장 사용법:</b> ${pair.recommended_usage}</div>
+            </div>
+          </div>`;
+      }).join("");
+
+      const td = data.time_division_guide || { am_available_products: [], pm_available_products: [] };
+      panel.innerHTML = `
+        <div class="space-y-4 text-left">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">내 화장대 전체 상극 & 시간대 구분</h3>
+            <span class="px-3 py-1 rounded-lg text-xs font-bold ${overallStyle.badge}">화장대 궁합: ${data.overall_risk}</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="p-3.5 rounded-xl bg-sky-50/70 border border-sky-200">
+              <div class="font-bold text-sky-900 mb-1">☀️ 아침 사용 가능 (${td.am_available_products.length}종)</div>
+              <div class="text-slate-700 leading-relaxed break-words">${td.am_available_products.join(", ") || "없음"}</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
+              <div class="font-bold text-indigo-900 mb-1">🌙 저녁 사용 가능 (${td.pm_available_products.length}종)</div>
+              <div class="text-slate-700 leading-relaxed break-words">${td.pm_available_products.join(", ") || "없음"}</div>
+            </div>
+          </div>
+          <div class="space-y-2.5 max-h-[460px] overflow-y-auto custom-scroll pr-0.5">${pairListHtml}</div>
+        </div>`;
+    }
+
+    // =========================================================================
+    // [MENU 4: AI 루틴 · 이너뷰티 추천 로직]
+    // =========================================================================
+    async function handleSupplementSearch(query) {
+      const dropdown = document.getElementById("supp-search-dropdown");
+      if (!query || query.trim().length < 1) { dropdown.classList.add("hidden"); return; }
+      try {
+        const res = await fetch(`${API_BASE}/api/supplements/search?q=${encodeURIComponent(query)}&limit=10`);
+        const data = await res.json();
+        dropdown.innerHTML = (!data.items || data.items.length === 0)
+          ? `<div class="p-3.5 text-xs text-slate-400">일치하는 영양제가 없습니다.</div>`
+          : data.items.map(item => `
+              <div onclick='addSupplementFromDb(${JSON.stringify(item).replace(/'/g, "&apos;")})' class="p-3 hover:bg-teal-50 cursor-pointer border-b border-slate-100 last:border-none">
+                <div class="text-xs font-bold text-slate-800 break-words">[${item.brand}] ${item.name}</div>
+                <div class="text-[11px] text-slate-400 line-clamp-1 mt-0.5">${item.sample_ingredients || "건강기능식품"}</div>
+              </div>`).join("");
+        dropdown.classList.remove("hidden");
+      } catch (e) {}
+    }
+
+    function addSupplementFromDb(item) {
+      document.getElementById("supp-search-dropdown").classList.add("hidden");
+      document.getElementById("supp-search-input").value = "";
+      const fullName = `[${item.brand}] ${item.name}`;
+      const ings = item.sample_ingredients ? item.sample_ingredients.split(",").map(s => s.trim()) : [];
+      if (!selectedSupplements.some(s => s.name === fullName)) {
+        selectedSupplements.push({
+          id: String(item.product_id),
+          name: fullName,
+          ingredients: ings,
+          raw_ingredients_text: item.raw_ingredients_text || ""
+        });
+        hasConfiguredProfile = true;
+        renderSelectedSupplements();
+        runTab2AiRoutine();
+        syncUserStateToServer();
+      }
+    }
+
+    function removeSupplement(idx) {
+      selectedSupplements.splice(idx, 1);
+      renderSelectedSupplements();
+      if (lastRoutineApiData) runTab2AiRoutine();
+      syncUserStateToServer();
+    }
+
+    function clearSupplements() {
+      selectedSupplements = [];
+      renderSelectedSupplements();
+      if (lastRoutineApiData) runTab2AiRoutine();
+      syncUserStateToServer();
+    }
+
+    function renderSelectedSupplements() {
+      const container = document.getElementById("selected-supp-chips");
+      const cnt = selectedSupplements.length;
+      document.getElementById("inner-count-badge").textContent = cnt;
+      const mobBadge = document.getElementById("mob-inner-count-badge");
+      if (mobBadge) mobBadge.textContent = cnt;
+
+      if (cnt === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-400">등록된 복용 영양제가 없습니다.</span>`;
+        return;
+      }
+      container.innerHTML = selectedSupplements.map((s, i) => `
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold max-w-full">
+          <span class="truncate">💊 ${s.name}</span>
+          <button onclick="removeSupplement(${i})" class="text-emerald-600 hover:text-rose-600 font-bold px-1 shrink-0">✕</button>
+        </span>`).join("");
+    }
+
+    function renderAiRoutineEmptyOrResult() {
+      if (lastRoutineApiData) {
+        renderTab2RoutineResult(lastRoutineApiData);
+      } else {
+        const panel = document.getElementById("routine-result-panel");
+        panel.className = "bg-white rounded-2xl p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] flex flex-col items-center justify-center text-center shadow-2xs";
+        panel.innerHTML = `
+          <div class="text-sm sm:text-base font-bold text-slate-700 mb-1.5">AI 맞춤 루틴 & 이너뷰티 분석 대기 중</div>
+          <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
+            좌측에서 피부 유형과 고민, 희망 영양제 추천 개수를 선택한 뒤<br/><b>[AI 맞춤 루틴 & 이너뷰티 추천 실행]</b> 버튼을 눌러주세요.
+          </p>`;
+      }
+    }
+
+    async function runTab2AiRoutine() {
+      hasConfiguredProfile = true;
+      const panel = document.getElementById("routine-result-panel");
+      const concern = document.getElementById("routine-concern-select").value;
+      const styleId = parseInt(document.getElementById("routine-style-select").value, 10);
+      const suppLimit = parseInt(document.getElementById("supplement-limit-select").value, 10) || 3;
+      const makeup = parseInt(document.getElementById("life-makeup").value, 10);
+      const sleep = parseInt(document.getElementById("life-sleep").value, 10);
+      const outdoor = parseInt(document.getElementById("life-outdoor").value, 10);
+      const alcohol = parseInt(document.getElementById("life-alcohol").value, 10);
+      const workout = parseInt(document.getElementById("life-workout").value, 10);
+
+      const payload = {
+        skin_type: selectedSkinType,
+        concern: concern,
+        care_style_id: styleId,
+        supplement_limit: suppLimit,
+        lifestyle: { makeup, sleep, outdoor, alcohol, workout },
+        env_context: {
+          region_name: currentWeatherObj.region_name || null,
+          data_source: currentWeatherObj.data_source || "UNAVAILABLE",
+          is_live: Boolean(currentWeatherObj.is_live),
+          temp: currentWeatherObj.temp,
+          humidity: currentWeatherObj.humidity,
+          uv_index: currentWeatherObj.uv_index,
+          uv_level: currentWeatherObj.uv_level || null,
+          uv_max_today: currentWeatherObj.uv_max_today,
+          uv_max_level: currentWeatherObj.uv_max_level || null,
+          pm25: currentWeatherObj.pm25
+        },
+        cosmetic_product_ids: vanityBasket.map(p => p.product_id),
+        vanity_items: vanityBasket.map(p => ({
+          product_id: p.product_id || 0,
+          brand: p.brand || "",
+          name: p.name,
+          category: p.category || "",
+          item_type: p.item_type || "스킨케어",
+          active_ingredients: p.active_ingredients || [],
+          raw_ingredients_text: p.raw_ingredients_text || ""
+        })),
+        user_supplements: selectedSupplements,
+        supplement_product_ids: [],
+        extra_ingredients: vanityBasket.flatMap(p => p.active_ingredients || [])
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/routine/recommend`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          panel.innerHTML = `<div class="p-4 text-xs text-rose-600 font-bold">${data.user_message || "추천 중 오류가 발생했습니다."}</div>`;
+          return;
+        }
+        lastRoutineApiData = data;
+        editableMorningSteps = JSON.parse(JSON.stringify(data.time_based_schedule.morning_detailed || []));
+        editableNightSteps = JSON.parse(JSON.stringify(data.time_based_schedule.night_detailed || []));
+
+        renderTab2RoutineResult(data);
+        const archiveDetail = `
+          <div>• <b>피부 설정:</b> [${data.ai_recommendation.skin_type}] ${data.ai_recommendation.target_concern} (${data.ai_recommendation.care_style})</div>
+          <div>• <b>아침 루틴:</b> ${(data.time_based_schedule.morning_routine || []).join(" → ")}</div>
+          <div>• <b>저녁 루틴:</b> ${(data.time_based_schedule.night_routine || []).join(" → ")}</div>
+          <div>• <b>추천 영양소(${suppLimit}종):</b> ${(data.inner_beauty_matching.recommended_nutrients || []).join(", ")}</div>
+        `;
+        saveToArchive(
+          "AI 루틴 · 이너뷰티",
+          `[${data.ai_recommendation.skin_type}] ${data.ai_recommendation.target_concern}`,
+          `적합도 ${data.score_evaluation.total_score}점 · 보유 활용률 ${data.score_evaluation.utilization_rate}%`,
+          archiveDetail
+        );
+        syncUserStateToServer();
+      } catch (err) {
+        panel.innerHTML = `<div class="p-4 text-xs text-rose-600 font-bold">서버 연결 오류 (${err.message})</div>`;
+      }
+    }
+
+    function moveRoutineStep(timeSlot, index, direction) {
+      const arr = timeSlot === "AM" ? editableMorningSteps : editableNightSteps;
+      const targetIdx = index + direction;
+      if (targetIdx < 0 || targetIdx >= arr.length) return;
+      const temp = arr[index];
+      arr[index] = arr[targetIdx];
+      arr[targetIdx] = temp;
+      arr.forEach((s, i) => s.step_number = i + 1);
+      if (lastRoutineApiData) renderTab2RoutineResult(lastRoutineApiData);
+      syncUserStateToServer();
+    }
+
+    function removeRoutineStep(timeSlot, index) {
+      const arr = timeSlot === "AM" ? editableMorningSteps : editableNightSteps;
+      arr.splice(index, 1);
+      arr.forEach((s, i) => s.step_number = i + 1);
+      if (lastRoutineApiData) renderTab2RoutineResult(lastRoutineApiData);
+      syncUserStateToServer();
+    }
+
+    function addCustomRoutineStep(timeSlot) {
+      const inputId = timeSlot === "AM" ? "custom-am-step-input" : "custom-pm-step-input";
+      const val = document.getElementById(inputId).value.trim();
+      if (!val) return;
+      const arr = timeSlot === "AM" ? editableMorningSteps : editableNightSteps;
+      arr.push({
+        step_number: arr.length + 1,
+        step_title: val,
+        target_item_type: "직접 추가",
+        frequency_badge: timeSlot === "AM" ? "☀️ 아침 단계" : "🌙 저녁 단계",
+        fit_score: 95,
+        status: "OWNED",
+        owned_product: { brand: "커스텀", name: val, item_type: "직접 추가", active_ingredients: [] },
+        recommended_products: [],
+        good_ingredients: ["맞춤 케어"],
+        avoid_ingredients: ["자극 성분"],
+        criteria_tip: "사용자가 직접 구성에 추가한 맞춤 단계입니다.",
+        xai_explanation: { reasons: ["사용자가 직접 추가한 루틴 단계입니다."], evidence: [], extra_guide: "" }
+      });
+      document.getElementById(inputId).value = "";
+      if (lastRoutineApiData) renderTab2RoutineResult(lastRoutineApiData);
+      syncUserStateToServer();
+    }
+
+    function renderDetailedStepCard(stepObj, idx, totalLen, timeSlot) {
+      const owned = stepObj.owned_product;
+      const recs = (stepObj.recommended_products || []).slice(0, 4);
+      const xai = stepObj.xai_explanation || { reasons: [], evidence: [], extra_guide: "" };
+      const xaiBoxId = `xai-box-${timeSlot}-${idx}`;
+
+      let ownedBoxHtml = "";
+      if (owned) {
+        ownedBoxHtml = `
+          <div class="p-3 rounded-xl bg-teal-50 border border-teal-200 text-xs">
+            <div class="text-[11px] text-teal-700 font-bold">✓ 내 화장대 보유 제품 (1순위 배치)</div>
+            <div class="font-bold text-slate-900 mt-0.5 break-words">[${owned.brand}] ${owned.name}</div>
+          </div>`;
+      }
+
+      let recsListHtml = "";
+      if (recs.length > 0) {
+        const recHeader = owned ? `대체·추가 추천 후보 (${recs.length}종)` : `제형별 맞춤 추천 제품 (${recs.length}종)`;
+        recsListHtml = `
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-bold text-sky-800">${recHeader}</div>
+            ${recs.map((recItem, rIdx) => `
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs space-y-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <span class="inline-block px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-extrabold mr-1">${rIdx + 1}순위 · ${recItem.fit_score || 90}%</span>
+                    <span class="font-bold text-slate-900 break-words">[${recItem.brand}] ${recItem.name}</span>
+                  </div>
+                  <button onclick='addToVanityBasket(${JSON.stringify(recItem).replace(/'/g, "&apos;")})' class="shrink-0 px-2 py-0.5 rounded bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 text-[10px] font-bold transition">
+                    + 담기
+                  </button>
+                </div>
+                <div class="text-[11px] text-teal-800 font-medium leading-snug">
+                  💡 <b>추천 이유:</b> ${recItem.recommend_reason || "피부 유형 및 유효성분 적합"}
+                </div>
+              </div>
+            `).join("")}
+          </div>`;
+      }
+
+      return `
+        <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
+          <div class="flex items-center justify-between gap-1.5">
+            <span class="font-extrabold text-xs text-slate-900 break-words">${idx + 1}. ${stepObj.step_title}</span>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="moveRoutineStep('${timeSlot}', ${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 px-1.5 py-1 text-xs"' : 'class="px-1.5 py-1 rounded bg-slate-100 text-xs text-slate-700"'}>▲</button>
+              <button onclick="moveRoutineStep('${timeSlot}', ${idx}, 1)" ${idx === totalLen - 1 ? 'disabled class="opacity-30 px-1.5 py-1 text-xs"' : 'class="px-1.5 py-1 rounded bg-slate-100 text-xs text-slate-700"'}>▼</button>
+              <button onclick="removeRoutineStep('${timeSlot}', ${idx})" class="px-1.5 py-1 rounded bg-rose-50 text-xs text-rose-500 font-bold">✕</button>
+            </div>
+          </div>
+
+          ${ownedBoxHtml}
+          ${recsListHtml}
+
+          <div class="pt-1 border-t border-slate-100">
+            <button type="button" onclick="togglePairDetail('${xaiBoxId}')" class="w-full flex items-center justify-between text-xs text-teal-700 font-bold hover:underline py-1">
+              <span>성분 기준 · 추천 근거 ▾</span>
+              <span class="text-[10px] text-slate-400 font-normal">${stepObj.frequency_badge || ""}</span>
+            </button>
+            <div id="${xaiBoxId}" class="hidden mt-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 space-y-1.5 leading-relaxed">
+              <div><b class="text-emerald-700">⭕ 포함 권장(O):</b> ${(stepObj.good_ingredients || []).join(", ")}</div>
+              <div><b class="text-rose-600">❌ 배제 권장(X):</b> ${(stepObj.avoid_ingredients || []).join(", ")}</div>
+              ${stepObj.criteria_tip ? `<div class="text-slate-600"><b>• 제형·성분 기준:</b> ${stepObj.criteria_tip}</div>` : ""}
+              ${(xai.reasons || []).map(r => `<div>• ${r}</div>`).join("")}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderTab2RoutineResult(data) {
+      const panel = document.getElementById("routine-result-panel");
+      const ai = data.ai_recommendation || {};
+      const scoreEval = data.score_evaluation || { total_score: 90, utilization_rate: 0, breakdown: [] };
+      const overallGuide = ai.overall_ingredient_guide || {};
+      const diag = data.routine_diagnosis || {};
+      const inner = data.inner_beauty_matching || {};
+      const envRef = data.env_reflected || {};
+
+      const breakdownHtml = (scoreEval.breakdown || []).map(b => {
+        const pct = Math.min(100, Math.round((b.score / b.max_score) * 100));
+        return `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700">${b.label}</span>
+              <span class="font-bold text-teal-700">${b.score} / ${b.max_score}점</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+              <div class="h-full bg-teal-600 rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>`;
+      }).join("");
+
+      const envRationaleItems = Array.isArray(envRef.rationale_items) ? envRef.rationale_items : [];
+      const envBannerHtml = `
+        <div class="p-3 rounded-xl ${envRef.is_available ? 'bg-sky-50/70 border border-sky-200' : 'bg-slate-50 border border-slate-200'} text-xs space-y-1.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="font-bold ${envRef.is_available ? 'text-sky-900' : 'text-slate-700'}">
+              🌤️ 반영된 날씨·UV 기준: ${envRef.summary || "기상 데이터 미수신"}
+            </span>
+            ${envRationaleItems.length > 0 ? `<button type="button" onclick="togglePairDetail('ai-env-rationale-box')" class="text-teal-700 font-bold hover:underline text-[11px]">근거 ▾</button>` : ""}
+          </div>
+          ${envRationaleItems.length > 0 ? `
+            <div id="ai-env-rationale-box" class="hidden pt-1.5 border-t border-sky-200/80 space-y-1 text-slate-700">
+              ${envRationaleItems.map(r => `<div>• <b>${r.factor}:</b> ${r.reason}</div>`).join("")}
+            </div>
+          ` : ""}
+        </div>`;
+
+      const amCardsHtml = editableMorningSteps.map((st, i) => renderDetailedStepCard(st, i, editableMorningSteps.length, "AM")).join("");
+      const pmCardsHtml = editableNightSteps.map((st, i) => renderDetailedStepCard(st, i, editableNightSteps.length, "PM")).join("");
+
+      const excludedList = diag.excluded_vanity_products || [];
+      const excludedHtml = excludedList.length > 0
+        ? `
+          <div class="p-4 rounded-xl bg-rose-50/60 border border-rose-200 space-y-2.5">
+            <div class="flex items-center justify-between cursor-pointer" onclick="togglePairDetail('ai-excluded-products-list')">
+              <span class="text-xs font-extrabold text-rose-900">보유 제품 중 루틴 제외·분리 항목 (${excludedList.length}건)</span>
+              <span class="text-xs text-rose-700 font-bold">사유 보기 ▾</span>
+            </div>
+            <div id="ai-excluded-products-list" class="hidden space-y-2 pt-1">
+              ${excludedList.map(ex => `
+                <div class="p-3 rounded-xl bg-white border border-rose-200 text-xs">
+                  <div class="font-bold text-slate-900 break-words">[${ex.brand}] ${ex.name} <span class="text-rose-700">(${ex.excluded_scope})</span></div>
+                  <div class="text-xs text-slate-600 mt-1 leading-relaxed">${ex.reason}</div>
+                </div>`).join("")}
+            </div>
+          </div>`
+        : "";
+
+      const userSuppList = inner.user_registered_supplements || [];
+      const aiSuppList = inner.detailed_supplements || [];
+      const dupWarns = inner.duplicate_warnings || [];
+      const crossNotes = inner.cross_cosmetic_notes || [];
+
+      const morningItems = [
+        ...userSuppList.filter(u => u.when_category === "MORNING").map(u => `[복용중] ${u.name}`),
+        ...aiSuppList.filter(s => s.when_category === "MORNING").map(s => `[AI추천] ${s.nutrient}`)
+      ];
+      const lunchItems = [
+        ...userSuppList.filter(u => u.when_category === "LUNCH_DINNER").map(u => `[복용중] ${u.name}`),
+        ...aiSuppList.filter(s => s.when_category === "LUNCH_DINNER").map(s => `[AI추천] ${s.nutrient}`)
+      ];
+      const nightItems = [
+        ...userSuppList.filter(u => u.when_category === "NIGHT").map(u => `[복용중] ${u.name}`),
+        ...aiSuppList.filter(s => s.when_category === "NIGHT").map(s => `[AI추천] ${s.nutrient}`)
+      ];
+
+      const userSuppSectionHtml = `
+        <div class="p-3.5 rounded-xl bg-white border border-teal-200 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-teal-900">📌 내가 등록한 복용 영양제 (${userSuppList.length}종)</span>
+            <span class="text-[11px] text-slate-400">중복 추천 자동 제외됨</span>
+          </div>
+          ${userSuppList.length === 0
+            ? `<div class="text-xs text-slate-400 py-1">현재 등록된 복용 영양제가 없습니다. 좌측에서 검색해 추가할 수 있습니다.</div>`
+            : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                ${userSuppList.map(u => `
+                  <div class="p-3 rounded-xl bg-teal-50/40 border border-teal-200 text-xs space-y-1.5">
+                    <div class="flex flex-wrap items-center justify-between gap-1">
+                      <span class="font-extrabold text-slate-900 break-words">${u.name}</span>
+                      <span class="text-[11px] font-bold text-amber-800">${u.when_slot}</span>
+                    </div>
+                    <div class="text-xs text-teal-800 font-medium leading-relaxed">${u.compat_note}</div>
+                    <div class="text-xs text-slate-600 leading-relaxed"><b>복용법:</b> ${u.how_to_take}</div>
+                  </div>`).join("")}
+              </div>`
+          }
+        </div>`;
+
+      const aiSuppCardsHtml = aiSuppList.map((s, sIdx) => {
+        const dbProds = s.recommended_products || [];
+        const suppDetailId = `ai-supp-detail-${sIdx}`;
+        return `
+          <div class="p-3.5 rounded-xl bg-white border border-slate-200 text-xs space-y-2 shadow-2xs">
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold">${s.priority_rank || (sIdx + 1)}순위</span>
+                <span class="font-extrabold text-slate-900 text-xs sm:text-sm">💊 ${s.nutrient}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold">${s.priority_tag || "맞춤 추천"}</span>
+            </div>
+
+            <div class="text-[11px] font-bold text-amber-800">${s.when_slot}</div>
+
+            <div class="p-2.5 rounded-lg bg-slate-50 text-xs text-slate-700 leading-relaxed space-y-1">
+              <div><b>🧬 피부 유형 근거:</b> ${s.skin_type_rationale || s.why_recommended}</div>
+              <div><b>✨ 선정 사유:</b> ${s.custom_match_reason || s.why_recommended}</div>
+            </div>
+
+            <div>
+              <button type="button" onclick="togglePairDetail('${suppDetailId}')" class="text-xs text-teal-700 font-bold hover:underline">
+                섭취 방법 · 식약처 제품 예시 ▾
+              </button>
+              <div id="${suppDetailId}" class="hidden mt-1.5 pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 leading-relaxed">
+                <div><b>• 올바른 복용법:</b> ${s.how_to_take}</div>
+                <div><b>• 주의 및 시너지:</b> ${s.caution_tip}</div>
+                ${dbProds.length > 0 ? `
+                  <div class="text-[11px] text-slate-500 break-words">
+                    <b>• 식약처 제품 예시:</b> ${dbProds.map(dp => `[${dp.brand}] ${dp.name}`).join(" · ")}
+                  </div>
+                ` : ""}
+              </div>
+            </div>
+          </div>`;
+      }).join("");
+
+      panel.className = "bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 text-left space-y-5 shadow-2xs";
+      panel.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div class="min-w-0">
+            <span class="inline-block px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-bold">${ai.skin_type_label || selectedSkinType}</span>
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 mt-1.5 break-words">[${ai.skin_type || selectedSkinType} · ${ai.target_concern}] ${ai.care_style}</h3>
+            <p class="text-xs text-slate-500 mt-1">보유 화장품 활용률 ${scoreEval.utilization_rate}% (${scoreEval.used_owned_count}/${scoreEval.total_owned_count}종)</p>
+          </div>
+          <div class="flex sm:block items-center justify-between bg-teal-600 text-white px-4 py-3 rounded-2xl shrink-0">
+            <div class="text-xs sm:text-[10px] text-teal-100 font-semibold">종합 루틴 적합도</div>
+            <div class="text-2xl font-black">${scoreEval.total_score}<span class="text-xs font-normal">/100</span></div>
+          </div>
+        </div>
+
+        ${envBannerHtml}
+
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="text-xs font-extrabold text-slate-800 mb-1">항목별 적합도 점수</div>
+          ${breakdownHtml}
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-slate-800">피부 유형 · 고민 핵심 성분 기준</span>
+            <button type="button" onclick="togglePairDetail('overall-ing-guide-detail')" class="text-teal-700 font-bold hover:underline text-[11px]">
+              상세 가이드 근거 ▾
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div class="font-bold text-emerald-900 mb-1">⭕ 권장 포함 성분 (O)</div>
+              <div class="text-emerald-800 leading-relaxed break-words">${(overallGuide.good_ingredients || []).join(", ")}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+              <div class="font-bold text-rose-900 mb-1">❌ 권장 배제·주의 성분 (X)</div>
+              <div class="text-rose-800 leading-relaxed break-words">${(overallGuide.avoid_ingredients || []).join(", ")}</div>
+            </div>
+          </div>
+          <div id="overall-ing-guide-detail" class="hidden p-3 rounded-lg bg-white border border-slate-200 text-slate-600 leading-relaxed">
+            ${overallGuide.summary_guide || ai.coaching_tip || ""}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="font-extrabold text-xs sm:text-sm text-slate-900">☀️ 아침(AM) 루틴 (${editableMorningSteps.length}단계)</div>
+            <div class="space-y-2.5">${amCardsHtml}</div>
+            <div class="pt-2 flex gap-1.5">
+              <input id="custom-am-step-input" type="text" placeholder="단계 직접 추가" class="flex-1 min-h-[38px] px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white" />
+              <button onclick="addCustomRoutineStep('AM')" class="min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold shrink-0">+ 추가</button>
+            </div>
+          </div>
+
+          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="font-extrabold text-xs sm:text-sm text-slate-900">🌙 저녁(PM) 루틴 (${editableNightSteps.length}단계)</div>
+            <div class="space-y-2.5">${pmCardsHtml}</div>
+            <div class="pt-2 flex gap-1.5">
+              <input id="custom-pm-step-input" type="text" placeholder="단계 직접 추가" class="flex-1 min-h-[38px] px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white" />
+              <button onclick="addCustomRoutineStep('PM')" class="min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold shrink-0">+ 추가</button>
+            </div>
+          </div>
+        </div>
+
+        ${excludedHtml}
+
+        <div class="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-1">
+            <h4 class="text-xs sm:text-sm font-extrabold text-emerald-950">💊 이너뷰티 통합 복용 시간표 & 맞춤 추천</h4>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[11px] font-bold">신규 추천 ${aiSuppList.length}종 선정</span>
+          </div>
+
+          ${dupWarns.map(w => `<div class="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 font-bold leading-relaxed">⚠️ ${w}</div>`).join("")}
+          ${crossNotes.map(n => `<div class="p-3 rounded-xl bg-rose-50 border border-rose-300 text-xs text-rose-900 font-bold leading-relaxed">${n}</div>`).join("")}
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="font-bold text-amber-800 mb-1">☀️ 아침 식전·식후</div>
+              <div class="text-slate-800 font-semibold leading-relaxed break-words">${morningItems.length > 0 ? morningItems.join(", ") : "-"}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="font-bold text-sky-800 mb-1">🌤️ 점심·저녁 식후</div>
+              <div class="text-slate-800 font-semibold leading-relaxed break-words">${lunchItems.length > 0 ? lunchItems.join(", ") : "-"}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="font-bold text-indigo-800 mb-1">🌙 저녁 식후·취침 전</div>
+              <div class="text-slate-800 font-semibold leading-relaxed break-words">${nightItems.length > 0 ? nightItems.join(", ") : "-"}</div>
+            </div>
+          </div>
+
+          ${userSuppSectionHtml}
+
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-extrabold text-emerald-950">✨ AI 우선순위 맞춤 추천 영양소 (중복 제외 · 상위 ${aiSuppList.length}종)</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              ${aiSuppCardsHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // [MENU 5: 리포트 보관함 (10개 단위 페이지네이션 · 상세 확인 · 개별 삭제)]
+    // =========================================================================
+    function saveToArchive(type, title, summary, detailsHtml = "") {
+      archiveList.unshift({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        date: new Date().toLocaleString("ko-KR"),
+        type,
+        title,
+        summary,
+        detailsHtml
+      });
+      archiveList = archiveList.slice(0, 100);
+      archiveCurrentPage = 1;
+      updateArchiveBadge();
+      renderHomeDashboard();
+      syncUserStateToServer();
+    }
+
+    function updateArchiveBadge() {
+      const cnt = archiveList.length;
+      document.getElementById("archive-count-badge").textContent = cnt;
+      const mobBadge = document.getElementById("mob-archive-count-badge");
+      if (mobBadge) mobBadge.textContent = cnt;
+    }
+
+    function goToArchivePage(pageNum) {
+      const totalPages = Math.max(1, Math.ceil(archiveList.length / ARCHIVE_PAGE_SIZE));
+      archiveCurrentPage = Math.max(1, Math.min(totalPages, pageNum));
+      renderArchiveList();
+    }
+
+    function deleteArchiveItem(reportId) {
+      archiveList = archiveList.filter(item => String(item.id) !== String(reportId));
+      const totalPages = Math.max(1, Math.ceil(archiveList.length / ARCHIVE_PAGE_SIZE));
+      if (archiveCurrentPage > totalPages) {
+        archiveCurrentPage = totalPages;
+      }
+      updateArchiveBadge();
+      renderArchiveList();
+      renderHomeDashboard();
+      syncUserStateToServer();
+    }
+
+    function renderArchiveList() {
+      const container = document.getElementById("archive-list-container");
+      const compBox = document.getElementById("archive-comparison-box");
+      const statusText = document.getElementById("archive-page-status-text");
+      const paginationBar = document.getElementById("archive-pagination-bar");
+
+      const totalCount = archiveList.length;
+      if (statusText) {
+        statusText.textContent = `총 ${totalCount}건의 분석 리포트 (10개 단위 페이지네이션)`;
+      }
+
+      if (totalCount === 0) {
+        compBox.innerHTML = "";
+        paginationBar.innerHTML = "";
+        container.innerHTML = `<div class="col-span-full p-8 text-center text-xs text-slate-400">저장된 리포트가 없습니다.</div>`;
+        return;
+      }
+
+      if (totalCount >= 2) {
+        const cur = archiveList[0];
+        const prev = archiveList[1];
+        compBox.innerHTML = `
+          <div class="p-4 rounded-xl bg-teal-50/60 border border-teal-200 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3">
+            <div>
+              <div class="text-[11px] font-bold text-teal-700">최신 분석 (${cur.date})</div>
+              <div class="font-bold text-slate-900 mt-0.5 break-words">[${cur.type}] ${cur.title} — ${cur.summary}</div>
+            </div>
+            <div>
+              <div class="text-[11px] font-bold text-slate-500">직전 분석 (${prev.date})</div>
+              <div class="font-semibold text-slate-700 mt-0.5 break-words">[${prev.type}] ${prev.title} — ${prev.summary}</div>
+            </div>
+          </div>`;
+      } else {
+        compBox.innerHTML = "";
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / ARCHIVE_PAGE_SIZE));
+      if (archiveCurrentPage > totalPages) archiveCurrentPage = totalPages;
+
+      const startIdx = (archiveCurrentPage - 1) * ARCHIVE_PAGE_SIZE;
+      const pageItems = archiveList.slice(startIdx, startIdx + ARCHIVE_PAGE_SIZE);
+
+      container.innerHTML = pageItems.map((item, idx) => {
+        const globalNo = totalCount - (startIdx + idx);
+        const detailId = `archive-detail-${item.id}`;
+        const detailContent = item.detailsHtml
+          ? item.detailsHtml
+          : `<div>• <b>분석 유형:</b> ${item.type}</div><div>• <b>요약 결과:</b> ${item.summary}</div><div>• <b>기록 일시:</b> ${item.date}</div>`;
+
+        return `
+          <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex flex-col justify-between gap-2 text-xs">
+            <div class="space-y-1.5 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-[11px] font-extrabold text-slate-400">#${globalNo}</span>
+                  <span class="px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold shrink-0">${item.type}</span>
+                </div>
+                <span class="text-[11px] text-slate-400 shrink-0">${item.date}</span>
+              </div>
+              <div class="font-bold text-slate-800 break-words">${item.title}</div>
+              <div class="text-slate-600 break-words">${item.summary}</div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+              <button type="button" onclick="togglePairDetail('${detailId}')" class="text-teal-700 font-bold hover:underline text-[11px]">
+                상세 확인 ▾
+              </button>
+              <button type="button" onclick="deleteArchiveItem('${item.id}')" class="px-2 py-0.5 rounded bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-bold">
+                삭제
+              </button>
+            </div>
+
+            <div id="${detailId}" class="hidden p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] text-slate-600 space-y-1 leading-relaxed">
+              ${detailContent}
+            </div>
+          </div>`;
+      }).join("");
+
+      const blockSize = 5;
+      const currentBlock = Math.floor((archiveCurrentPage - 1) / blockSize);
+      const startPage = currentBlock * blockSize + 1;
+      const endPage = Math.min(totalPages, startPage + blockSize - 1);
+
+      let pageBtnsHtml = `
+        <button type="button" onclick="goToArchivePage(${archiveCurrentPage - 1})" ${archiveCurrentPage === 1 ? 'disabled class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-300 text-xs font-bold cursor-not-allowed"' : 'class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition"'}>
+          이전
+        </button>`;
+
+      for (let p = startPage; p <= endPage; p++) {
+        const activeCls = (p === archiveCurrentPage)
+          ? "px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-extrabold shadow-2xs"
+          : "px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition";
+        pageBtnsHtml += `<button type="button" onclick="goToArchivePage(${p})" class="${activeCls}">${p}</button>`;
+      }
+
+      pageBtnsHtml += `
+        <button type="button" onclick="goToArchivePage(${archiveCurrentPage + 1})" ${archiveCurrentPage === totalPages ? 'disabled class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-300 text-xs font-bold cursor-not-allowed"' : 'class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition"'}>
+          다음
+        </button>`;
+
+      paginationBar.innerHTML = pageBtnsHtml;
+    }
+
+    function clearArchive() {
+      archiveList = [];
+      archiveCurrentPage = 1;
+      updateArchiveBadge();
+      renderArchiveList();
+      renderHomeDashboard();
+      syncUserStateToServer();
+    }
+  </script>
+</body>
+</html>
