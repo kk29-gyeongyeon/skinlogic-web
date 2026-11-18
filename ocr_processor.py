@@ -1,6 +1,6 @@
 """
 SkinLogic OCR 전성분 정밀 추출 및 DB 기반 한글 자모 오타 자동 교정 모듈
-1. 이미지 2.5배 업스케일링 & 대비·선명도 전처리 (작은 한글 획 및 쉼표 인식 강화)
+1. 메모리 안전 해상도 최적화(최대 1100px 제한) & 대비·선명도 전처리 (502 OOM 방지)
 2. skinlogic.db 화장품 전성분 사전 연동 + 한글 자모(초·중·종성) 유사도 기반 오타 자동 교정
 3. 쉼표 누락으로 붙어버린 성분 문자열 자동 분리
 """
@@ -8,9 +8,16 @@ SkinLogic OCR 전성분 정밀 추출 및 DB 기반 한글 자모 오타 자동 
 import os
 import io
 import re
+import gc
 import sqlite3
 from difflib import SequenceMatcher
 from typing import List, Dict, Any, Tuple
+
+try:
+    import torch
+    torch.set_num_threads(1)
+except Exception:
+    pass
 
 try:
     from PIL import Image, ImageOps, ImageFilter
@@ -20,11 +27,17 @@ except ImportError:
 
 try:
     import easyocr
-    READER = easyocr.Reader(['ko', 'en'], gpu=False)
-except ImportError:
-    READER = None
+    READER = easyocr.Reader(['ko', 'en'], gpu=False, quantize=True)
+except Exception:
+    try:
+        import easyocr
+        READER = easyocr.Reader(['ko', 'en'], gpu=False)
+    except ImportError:
+        READER = None
 
-DB_PATH = "skinlogic.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VOLUME_DB_PATH = "/app/data/skinlogic.db"
+DB_PATH = VOLUME_DB_PATH if os.path.exists(VOLUME_DB_PATH) else os.path.join(BASE_DIR, "skinlogic.db")
 
 # 1. 노이즈 및 주석 제거용 정규식
 RE_PREFIX = re.compile(r"^(전성분|성분명|성분)\s*[:：]?\s*")
@@ -69,7 +82,7 @@ JONGSUNG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ'
 
 
 def to_jamo(text: str) -> str:
-    """한글 음절을 초성/중성/종성 자모로 분해하여 시각적 오타(ㅌ↔ㄷ, ㅋ↔ㅂ 등) 유사도 비교를 정밀화"""
+    """한글 음절을 초성/중성/종성 자모로 분해하여 시각적 오타 유사도 비교를 정밀화"""
     out = []
     for ch in text:
         code = ord(ch)
@@ -124,7 +137,6 @@ def build_ingredient_dictionary() -> Tuple[Dict[str, str], Dict[int, List[Tuple[
         exact_map[key_full] = canonical
         by_length.setdefault(len(key_full), []).append((key_full, canonical))
 
-        # 슬래시(/)가 포함된 복합 성분은 슬래시 제거 버전도 인덱싱하여 OCR 누락 시 복원
         if "/" in key_full:
             key_noslash = key_full.replace("/", "")
             if key_noslash not in exact_map:
@@ -139,21 +151,24 @@ ING_EXACT_MAP, ING_BY_LENGTH = build_ingredient_dictionary()
 
 def preprocess_image_for_ocr(image_bytes: bytes) -> bytes:
     """
-    작은 한글 획(틸, 콜, 톨 등)과 쉼표(,) 인식률을 높이기 위해
-    흑백 대비 최적화 + 2.5배 고해상도 업스케일링 + 선명화(Sharpen)를 수행합니다.
+    클라우드 서버 메모리(512MB) 초과(502 에러)를 방지하기 위해
+    긴 변을 최대 1100px 이내로 안전하게 조절한 뒤 흑백 대비·선명도 보정을 수행합니다.
     """
     if not HAS_PIL:
         return image_bytes
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
+        max_dim = max(w, h)
 
-        # 가로 1800px 미만 이미지는 2.5배 확대하여 작은 글씨와 쉼표를 선명하게 만듦
-        if w < 1800:
-            scale = min(2.8, max(2.0, 2200.0 / max(1, w)))
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        # 고해상도 캡처/사진은 최대 1100px로 축소하여 PyTorch 메모리 폭증 방지
+        if max_dim > 1100:
+            scale = 1100.0 / max_dim
+            img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
+        # 너무 작은 캡처 조각(600px 미만)만 적정 크기(950px)로 확대
+        elif max_dim < 600:
+            scale = min(2.0, 950.0 / max(1, max_dim))
+            img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
 
         gray = ImageOps.grayscale(img)
         gray = ImageOps.autocontrast(gray, cutoff=1)
@@ -182,10 +197,8 @@ def find_best_dictionary_match(token: str, min_sim: float = 0.78) -> Tuple[str, 
     best_canonical = clean
     best_score = 0.0
 
-    # 길이가 비슷한(-1 ~ +1) 사전 후보군만 빠르게 비교
     for cand_len in (t_len, t_len - 1, t_len + 1):
         for cand_key, canonical in ING_BY_LENGTH.get(cand_len, []):
-            # 첫 글자 또는 끝 글자 자모가 완전히 다르면 스킵하여 속도 및 정확도 향상
             sim = jamo_similarity(clean, cand_key)
             if sim > best_score:
                 best_score = sim
@@ -199,14 +212,12 @@ def find_best_dictionary_match(token: str, min_sim: float = 0.78) -> Tuple[str, 
 def segment_glued_ingredients(glued_text: str) -> List[str]:
     """
     EasyOCR이 쉼표를 놓쳐 여러 성분이 한 문자열로 붙은 경우
-    (예: '정제수글리세린부딪런글라이볼', '글리세렉골루코사이드카보머')
     전성분 사전을 이용해 개별 성분 단위로 분리하고 오타를 자동 교정합니다.
     """
     s = glued_text.replace(" ", "").strip(" .:-")
     if not s:
         return []
 
-    # 전체 문자열 자체가 하나의 성분과 일치하거나 매우 유사한 경우 바로 반환
     whole_match, whole_sim = find_best_dictionary_match(s, min_sim=0.80)
     if whole_sim >= 0.80:
         return [whole_match]
@@ -225,14 +236,12 @@ def segment_glued_ingredients(glued_text: str) -> List[str]:
         for win_len in range(max_win, 1, -1):
             sub = s[pos : pos + win_len]
 
-            # 1) 정확 매칭 우선 (긴 성분명 우선 선택)
             if sub in ING_EXACT_MAP:
                 best_win_len = win_len
                 best_word = ING_EXACT_MAP[sub]
                 best_rank_score = 2.0 + (win_len * 0.01)
                 break
 
-            # 2) 4글자 이상 구간에 대해 자모 유사도 교정 매칭
             if win_len >= 4:
                 matched_canon, sim = find_best_dictionary_match(sub, min_sim=0.80)
                 if sim >= 0.80:
@@ -278,7 +287,6 @@ def merge_wrapped_ocr_lines(raw_lines: List[str]) -> str:
         else:
             merged += " " + next_line
 
-    # '1, 2-핵산다이올' 또는 '1,2-핵산다이올'이 쉼표 분리로 쪼개지지 않도록 사전 정규화
     merged = re.sub(r"1\s*[,.\s]\s*2\s*-\s*", "1,2-", merged)
     return merged
 
@@ -300,7 +308,6 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
     combined_text = merge_wrapped_ocr_lines(raw_texts)
     cleaned_text = clean_text_chunk(combined_text)
 
-    # 1차: 쉼표/세미콜론 기준 분리
     primary_chunks = re.split(r"[,;，、\n]+", cleaned_text)
 
     deduped: List[str] = []
@@ -315,14 +322,12 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
         if not re.search(r"[가-힣]{2,}", chunk_clean):
             continue
 
-        # 공백으로 구분된 하위 토큰들도 각각 검사
         sub_space_tokens = chunk_clean.split(" ")
         for st in sub_space_tokens:
             st_clean = st.strip(" .:-")
             if len(st_clean) < 2 or not re.search(r"[가-힣]{2,}", st_clean):
                 continue
 
-            # 쉼표 누락으로 길게 붙은 경우 사전 기반 분할 및 오타 교정 실행
             extracted_list = segment_glued_ingredients(st_clean)
             for item in extracted_list:
                 if len(item) >= 2 and item not in seen:
@@ -334,7 +339,7 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
 
 def extract_ingredients_from_image(image_bytes: bytes) -> Dict[str, Any]:
     """
-    이미지 바이트 스트림을 고해상도 전처리한 뒤 EasyOCR로 전성분을 추출·교정합니다.
+    이미지 바이트 스트림을 메모리 안전 전처리한 뒤 EasyOCR로 전성분을 추출·교정합니다.
     """
     if READER is None:
         return {
@@ -351,7 +356,7 @@ def extract_ingredients_from_image(image_bytes: bytes) -> Dict[str, Any]:
             detail=0,
             paragraph=False,
             width_ths=0.35,
-            mag_ratio=1.2
+            mag_ratio=1.0
         )
         tokens = extract_and_normalize_tokens(results)
         return {
@@ -366,6 +371,8 @@ def extract_ingredients_from_image(image_bytes: bytes) -> Dict[str, Any]:
             "extracted_ingredients": [],
             "total_count": 0
         }
+    finally:
+        gc.collect()
 
 
 def process_label_image(img_path: str) -> List[str]:
