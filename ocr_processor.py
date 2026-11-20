@@ -1,8 +1,9 @@
 """
 SkinLogic OCR 전성분 정밀 추출 및 DB 기반 한글 자모 오타 자동 교정 모듈
-1. 메모리 안전 해상도 최적화(최대 1100px 제한) & 대비·선명도 전처리 (502 OOM 방지)
-2. skinlogic.db 화장품 전성분 사전 연동 + 한글 자모(초·중·종성) 유사도 기반 오타 자동 교정
-3. 쉼표 누락으로 붙어버린 성분 문자열 자동 분리
+1. EXIF 자동 회전 보정 + 메모리 안전 해상도 최적화(최대 1100px 제한) & 대비·선명도 전처리 (502 OOM 방지)
+2. EasyOCR 좌표 기반 줄/열 읽기 순서 정렬 + '전성분' 구간 자동 발췌(앞뒤 설명·주의사항 노이즈 제거)
+3. skinlogic.db 화장품 전성분 사전 연동 + 사전 계산된 한글 자모(초·중·종성) 유사도 기반 고속 오타 교정
+4. 쉼표 누락으로 붙어버린 성분 문자열 자동 분리 + 동시 요청 직렬화 락(512MB OOM 방지)
 """
 
 import os
@@ -10,6 +11,7 @@ import io
 import re
 import gc
 import sqlite3
+import threading
 from difflib import SequenceMatcher
 from typing import List, Dict, Any, Tuple
 
@@ -32,21 +34,62 @@ except Exception:
     try:
         import easyocr
         READER = easyocr.Reader(['ko', 'en'], gpu=False)
-    except ImportError:
+    except Exception:
         READER = None
+
+# 512MB 클라우드 컨테이너에서 동시 OCR 요청으로 인한 PyTorch 메모리 폭증(502) 방지
+OCR_LOCK = threading.Lock()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VOLUME_DB_PATH = "/app/data/skinlogic.db"
 DB_PATH = VOLUME_DB_PATH if os.path.exists(VOLUME_DB_PATH) else os.path.join(BASE_DIR, "skinlogic.db")
 
 # 1. 노이즈 및 주석 제거용 정규식
-RE_PREFIX = re.compile(r"^(전성분|성분명|성분)\s*[:：]?\s*")
+RE_PREFIX = re.compile(r"^(전성분|성분명|성분)\s*[:：\]\)\-]*\s*")
 RE_PARENTHESIS = re.compile(r"\(.*?\)|\[.*?\]")  # (0.25ppm), (CI 77891) 등 부가 표기 제거
-RE_SPECIAL_CHARS = re.compile(r"[*•·_~▪▶▷※]")
+RE_SPECIAL_CHARS = re.compile(r"[*•·_~▪▶▷※■□◆◇★☆]")
+
+# 전체 화면/라벨 촬영 시 '전성분' 구간만 자동 발췌하기 위한 시작·종료 앵커 정규식
+RE_SECTION_START = re.compile(
+    r"(?:화장품법에\s*따라\s*기재[·.,\s]*표시하여야\s*하는\s*모든\s*성분|"
+    r"\[?\s*전\s*성\s*분\s*\]?|"
+    r"모\s*든\s*성\s*분|"
+    r"성\s*분\s*명|"
+    r"INGREDIENTS?)\s*[:：\]\)\-]*\s*",
+    re.IGNORECASE
+)
+
+RE_SECTION_END = re.compile(
+    r"(?:사용\s*시(?:의)?\s*주의\s*사항|"
+    r"사용할\s*때(?:의)?\s*주의\s*사항|"
+    r"주의\s*사항|"
+    r"화장품\s*제조\s*업자|"
+    r"화장품\s*책임\s*판매\s*업자|"
+    r"제조\s*판매\s*업자|"
+    r"제조\s*업자|"
+    r"책임\s*판매\s*업자|"
+    r"소비자\s*상담\s*실|"
+    r"품질\s*보증\s*기준|"
+    r"보관\s*및\s*취급|"
+    r"사용\s*기한|"
+    r"제조\s*번호|"
+    r"효능\s*[·.\s]*효과|"
+    r"용법\s*[·.\s]*용량|"
+    r"본\s*제품에\s*이상이\s*있을\s*경우|"
+    r"공정거래위원회)"
+)
 
 NOISE_PHRASES = (
     "전성분", "성분명", "제조업자", "책임판매업자", "제조번호", "사용기한",
     "용량", "화장품법", "주의사항", "효능", "효과", "사용법", "보관방법", "소비자상담"
+)
+
+# 전성분이 아닌 일반 한국어 안내 문구(사용법·주의사항 등) 필터링용 어미/키워드
+NON_INGREDIENT_PROSE_CUES = (
+    "합니다", "십시오", "하세요", "됩니다", "입니다", "바랍니다", "있으므로",
+    "않도록", "경우에는", "전문의", "상담", "직사광선", "어린이", "닿지",
+    "상처가", "적당량", "피부결", "세안후", "가볍게", "두드려", "보관하",
+    "피해서", "주의하", "붉은반점", "부어오름", "가려움증"
 )
 
 # 2. 필수 표준 화장품 전성분 코어 사전 (DB 로드와 병합됨)
@@ -105,11 +148,11 @@ def jamo_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, ja, jb).ratio()
 
 
-def build_ingredient_dictionary() -> Tuple[Dict[str, str], Dict[int, List[Tuple[str, str]]]]:
+def build_ingredient_dictionary() -> Tuple[Dict[str, str], Dict[int, List[Tuple[str, str, str]]]]:
     """
     skinlogic.db의 실제 화장품 전성분과 코어 사전을 통합하여
     - norm_key -> 표준 성분명 매핑 사전
-    - 글자 길이별 (norm_key, 표준 성분명) 인덱스
+    - 글자 길이별 (norm_key, jamo_key, 표준 성분명) 인덱스 (자모 사전 계산으로 고속화)
     를 구축합니다.
     """
     vocab_set = set(CORE_INGREDIENT_VOCAB)
@@ -130,18 +173,18 @@ def build_ingredient_dictionary() -> Tuple[Dict[str, str], Dict[int, List[Tuple[
             pass
 
     exact_map: Dict[str, str] = {}
-    by_length: Dict[int, List[Tuple[str, str]]] = {}
+    by_length: Dict[int, List[Tuple[str, str, str]]] = {}
 
     for canonical in sorted(vocab_set, key=lambda x: (-len(x), x)):
         key_full = canonical.replace(" ", "")
         exact_map[key_full] = canonical
-        by_length.setdefault(len(key_full), []).append((key_full, canonical))
+        by_length.setdefault(len(key_full), []).append((key_full, to_jamo(key_full), canonical))
 
         if "/" in key_full:
             key_noslash = key_full.replace("/", "")
             if key_noslash not in exact_map:
                 exact_map[key_noslash] = canonical
-                by_length.setdefault(len(key_noslash), []).append((key_noslash, canonical))
+                by_length.setdefault(len(key_noslash), []).append((key_noslash, to_jamo(key_noslash), canonical))
 
     return exact_map, by_length
 
@@ -151,13 +194,16 @@ ING_EXACT_MAP, ING_BY_LENGTH = build_ingredient_dictionary()
 
 def preprocess_image_for_ocr(image_bytes: bytes) -> bytes:
     """
-    클라우드 서버 메모리(512MB) 초과(502 에러)를 방지하기 위해
-    긴 변을 최대 1100px 이내로 안전하게 조절한 뒤 흑백 대비·선명도 보정을 수행합니다.
+    1. 모바일 EXIF 회전(Orientation) 자동 보정 (세로 사진 90도 눕힘 방지)
+    2. 클라우드 서버 메모리(512MB) 초과(502 에러)를 방지하기 위해
+       긴 변을 최대 1100px 이내로 안전하게 조절한 뒤 흑백 대비·선명도 보정을 수행합니다.
     """
     if not HAS_PIL:
         return image_bytes
     try:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img = Image.open(io.BytesIO(image_bytes))
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
         w, h = img.size
         max_dim = max(w, h)
 
@@ -165,7 +211,7 @@ def preprocess_image_for_ocr(image_bytes: bytes) -> bytes:
         if max_dim > 1100:
             scale = 1100.0 / max_dim
             img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
-        # 너무 작은 캡처 조각(600px 미만)만 적정 크기(950px)로 확대
+        # 너무 작은 크롭/캡처 조각(600px 미만)만 적정 크기(950px)로 확대
         elif max_dim < 600:
             scale = min(2.0, 950.0 / max(1, max_dim))
             img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
@@ -182,7 +228,7 @@ def preprocess_image_for_ocr(image_bytes: bytes) -> bytes:
 
 
 def find_best_dictionary_match(token: str, min_sim: float = 0.78) -> Tuple[str, float]:
-    """단일 토큰을 전성분 사전과 대조하여 정확 매칭 또는 한글 자모 유사도 기반 오타 교정"""
+    """단일 토큰을 전성분 사전과 대조하여 정확 매칭 또는 사전 계산된 한글 자모 유사도 기반 고속 오타 교정"""
     clean = token.replace(" ", "")
     if not clean:
         return ("", 0.0)
@@ -191,22 +237,45 @@ def find_best_dictionary_match(token: str, min_sim: float = 0.78) -> Tuple[str, 
         return (ING_EXACT_MAP[clean], 1.0)
 
     t_len = len(clean)
-    if t_len < 3:
+    if t_len < 3 or t_len > 36:
         return (clean, 0.0)
+
+    ja = to_jamo(clean)
+    ja_len = len(ja)
+    sm = SequenceMatcher(None, "", ja)
 
     best_canonical = clean
     best_score = 0.0
 
     for cand_len in (t_len, t_len - 1, t_len + 1):
-        for cand_key, canonical in ING_BY_LENGTH.get(cand_len, []):
-            sim = jamo_similarity(clean, cand_key)
+        for _, cand_jamo, canonical in ING_BY_LENGTH.get(cand_len, []):
+            # 길이 기반 빠른 상한 필터
+            jb_len = len(cand_jamo)
+            if (2.0 * min(ja_len, jb_len)) / max(1, ja_len + jb_len) < min_sim:
+                continue
+            sm.set_seq1(cand_jamo)
+            if sm.quick_ratio() < min_sim:
+                continue
+            sim = sm.ratio()
             if sim > best_score:
                 best_score = sim
                 best_canonical = canonical
+                if best_score >= 0.98:
+                    return (best_canonical, best_score)
 
     if best_score >= min_sim:
         return (best_canonical, best_score)
     return (clean, best_score)
+
+
+def is_likely_prose_noise(text: str) -> bool:
+    """화장품 성분이 아닌 일반 한국어 안내문(사용법·주의사항 등) 여부 판별"""
+    compact = re.sub(r"\s+", "", text or "")
+    if not compact:
+        return True
+    if any(cue in compact for cue in NON_INGREDIENT_PROSE_CUES):
+        return True
+    return False
 
 
 def segment_glued_ingredients(glued_text: str) -> List[str]:
@@ -221,6 +290,14 @@ def segment_glued_ingredients(glued_text: str) -> List[str]:
     whole_match, whole_sim = find_best_dictionary_match(s, min_sim=0.80)
     if whole_sim >= 0.80:
         return [whole_match]
+
+    # 일반 안내 문구(사용법·주의사항)가 통째로 들어온 경우 고속 스킵하여 CPU/타임아웃 방지
+    if is_likely_prose_noise(s) and not any(kw in s for kw in ("정제수", "글리세린", "글라이콜", "추출물", "애씨드", "판테놀", "나이아신")):
+        return []
+
+    # 비정상적으로 긴 붙은 노이즈 문자열은 상한을 두어 연산 폭주 방지
+    if len(s) > 160:
+        s = s[:160]
 
     results: List[str] = []
     pos = 0
@@ -243,8 +320,8 @@ def segment_glued_ingredients(glued_text: str) -> List[str]:
                 break
 
             if win_len >= 4:
-                matched_canon, sim = find_best_dictionary_match(sub, min_sim=0.80)
-                if sim >= 0.80:
+                matched_canon, sim = find_best_dictionary_match(sub, min_sim=0.82)
+                if sim >= 0.82:
                     rank_sc = sim + (win_len * 0.005)
                     if rank_sc > best_rank_score:
                         best_rank_score = rank_sc
@@ -253,9 +330,10 @@ def segment_glued_ingredients(glued_text: str) -> List[str]:
 
         if best_win_len > 0:
             if unmatched_buf:
-                if len(unmatched_buf) >= 2 and re.search(r"[가-힣]{2,}", unmatched_buf):
-                    corr_buf, _ = find_best_dictionary_match(unmatched_buf, min_sim=0.76)
-                    results.append(corr_buf)
+                if len(unmatched_buf) >= 2 and re.search(r"[가-힣]{2,}", unmatched_buf) and not is_likely_prose_noise(unmatched_buf):
+                    corr_buf, sim_buf = find_best_dictionary_match(unmatched_buf, min_sim=0.76)
+                    if sim_buf >= 0.76 or len(unmatched_buf) <= 16:
+                        results.append(corr_buf)
                 unmatched_buf = ""
             results.append(best_word)
             pos += best_win_len
@@ -263,11 +341,119 @@ def segment_glued_ingredients(glued_text: str) -> List[str]:
             unmatched_buf += s[pos]
             pos += 1
 
-    if unmatched_buf and len(unmatched_buf) >= 2 and re.search(r"[가-힣]{2,}", unmatched_buf):
-        corr_buf, _ = find_best_dictionary_match(unmatched_buf, min_sim=0.76)
-        results.append(corr_buf)
+    if unmatched_buf and len(unmatched_buf) >= 2 and re.search(r"[가-힣]{2,}", unmatched_buf) and not is_likely_prose_noise(unmatched_buf):
+        corr_buf, sim_buf = find_best_dictionary_match(unmatched_buf, min_sim=0.76)
+        if sim_buf >= 0.76 or len(unmatched_buf) <= 16:
+            results.append(corr_buf)
 
     return results
+
+
+def sort_ocr_results_reading_order(detailed_results: List[Any]) -> List[str]:
+    """
+    EasyOCR detail=1 결과([(bbox, text, conf), ...])를 위->아래 줄 그룹, 왼->오른쪽 순으로 정렬합니다.
+    약간 기울어진 모바일 사진에서도 전성분 읽기 순서가 뒤섞이지 않도록 보정합니다.
+    """
+    items = []
+    for entry in (detailed_results or []):
+        try:
+            bbox, text, conf = entry
+        except Exception:
+            continue
+        t = str(text or "").strip()
+        if not t:
+            continue
+        # 신뢰도가 극도로 낮은 배경 노이즈 제거 (한글 2자 이상은 보수적으로 유지)
+        if float(conf) < 0.12 and not re.search(r"[가-힣]{2,}", t):
+            continue
+        xs = [float(p[0]) for p in bbox]
+        ys = [float(p[1]) for p in bbox]
+        x_min = min(xs)
+        y_center = (min(ys) + max(ys)) / 2.0
+        height = max(1.0, max(ys) - min(ys))
+        items.append((y_center, x_min, height, t))
+
+    if not items:
+        return []
+
+    items.sort(key=lambda x: x[0])
+
+    rows: List[List[Tuple[float, float, float, str]]] = []
+    for item in items:
+        y_c, _, h, _ = item
+        placed = False
+        for row in rows:
+            avg_y = sum(r[0] for r in row) / len(row)
+            avg_h = sum(r[2] for r in row) / len(row)
+            if abs(y_c - avg_y) <= max(avg_h * 0.55, 8.0):
+                row.append(item)
+                placed = True
+                break
+        if not placed:
+            rows.append([item])
+
+    rows.sort(key=lambda r: sum(x[0] for x in r) / len(r))
+    ordered_texts: List[str] = []
+    for row in rows:
+        row.sort(key=lambda x: x[1])
+        for _, _, _, t in row:
+            ordered_texts.append(t)
+    return ordered_texts
+
+
+def slice_ingredients_section(text: str) -> str:
+    """
+    전체 화면/라벨이 함께 찍힌 경우에도 '전성분' 시작 앵커부터
+    '사용 시의 주의사항 / 제조업자 / 책임판매업자' 종료 앵커 전까지 핵심 전성분 구간만 발췌합니다.
+    """
+    if not text:
+        return ""
+
+    section = text
+    start_found = False
+
+    start_matches = list(RE_SECTION_START.finditer(section))
+    if start_matches:
+        core_cues = (
+            "정제수", "글리세린", "부틸렌글라이콜", "프로판다이올", "다이프로필렌글라이콜",
+            "나이아신아마이드", "판테놀", "추출물", "애씨드", "글라이콜", "히알루론"
+        )
+        best_tail = None
+        best_score = (-1, -1)
+        for m in start_matches:
+            tail = section[m.end():].strip()
+            if len(tail) < 4:
+                continue
+            head = tail[:100]
+            comma_cnt = len(re.findall(r"[,;，、]", head))
+            core_cnt = sum(1 for kw in core_cues if kw in head)
+            sc = (core_cnt * 5 + comma_cnt * 2, m.start())
+            if sc > best_score:
+                best_score = sc
+                best_tail = tail
+        if best_tail:
+            section = best_tail
+            start_found = True
+
+    end_matches = list(RE_SECTION_END.finditer(section))
+    if end_matches:
+        ing_cues = ("정제수", "글리세린", "글라이콜", "추출물", "애씨드", "판테놀", "카보머", "베타인", "세라마이드", "히알루론")
+        for em in end_matches:
+            prefix = section[:em.start()].strip()
+            if start_found:
+                if len(prefix) >= 8:
+                    section = prefix
+                    break
+            else:
+                has_ing_signal = (
+                    len(re.findall(r"[,;，、]", prefix)) >= 1
+                    or any(cue in prefix for cue in ing_cues)
+                )
+                if len(prefix) >= 12 and has_ing_signal:
+                    section = prefix
+                    break
+
+    return section.strip()
 
 
 def merge_wrapped_ocr_lines(raw_lines: List[str]) -> str:
@@ -300,15 +486,20 @@ def clean_text_chunk(text: str) -> str:
 
 def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
     """
-    OCR 인식 원문 블록을 결합한 뒤 쉼표 분리 + 붙은 성분 사전 분할 + 한글 자모 오타 교정을 수행합니다.
+    OCR 인식 원문 블록을 결합한 뒤 '전성분' 구간 자동 발췌 + 쉼표 분리 +
+    붙은 성분 사전 분할 + 한글 자모 오타 교정을 수행합니다.
     """
     if not raw_texts:
         return []
 
     combined_text = merge_wrapped_ocr_lines(raw_texts)
-    cleaned_text = clean_text_chunk(combined_text)
+    # 괄호 제거 전에 [전성분] / 주의사항 구간을 먼저 정확히 발췌
+    section_text = slice_ingredients_section(combined_text)
+    cleaned_text = clean_text_chunk(section_text)
 
-    primary_chunks = re.split(r"[,;，、\n]+", cleaned_text)
+    # '1,2-헥산다이올', '1,3-부틸렌글라이콜' 등 화학명 내부의 숫자 쉼표가 분리되지 않도록 임시 보호
+    protected_text = re.sub(r"(\d)\s*,\s*(\d)\s*-", r"\1__NUMCOMMA__\2-", cleaned_text)
+    primary_chunks = [c.replace("__NUMCOMMA__", ",") for c in re.split(r"[,;，、\n]+", protected_text)]
 
     deduped: List[str] = []
     seen = set()
@@ -317,9 +508,15 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
         chunk_clean = re.sub(r"\s+", " ", chunk).strip(" .:-")
         if len(chunk_clean) < 2:
             continue
+        # 청크 앞머리에 남은 '전성분:' 라벨이 있으면 제거하고 성분을 살림
+        chunk_clean = RE_PREFIX.sub("", chunk_clean).strip(" .:-")
+        if len(chunk_clean) < 2:
+            continue
         if any(noise in chunk_clean for noise in NOISE_PHRASES):
             continue
         if not re.search(r"[가-힣]{2,}", chunk_clean):
+            continue
+        if is_likely_prose_noise(chunk_clean):
             continue
 
         sub_space_tokens = chunk_clean.split(" ")
@@ -330,7 +527,7 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
 
             extracted_list = segment_glued_ingredients(st_clean)
             for item in extracted_list:
-                if len(item) >= 2 and item not in seen:
+                if len(item) >= 2 and item not in seen and not is_likely_prose_noise(item):
                     seen.add(item)
                     deduped.append(item)
 
@@ -339,7 +536,8 @@ def extract_and_normalize_tokens(raw_texts: List[str]) -> List[str]:
 
 def extract_ingredients_from_image(image_bytes: bytes) -> Dict[str, Any]:
     """
-    이미지 바이트 스트림을 메모리 안전 전처리한 뒤 EasyOCR로 전성분을 추출·교정합니다.
+    이미지 바이트 스트림을 EXIF 회전 보정 및 메모리 안전 전처리한 뒤
+    EasyOCR로 전성분을 추출·교정합니다.
     """
     if READER is None:
         return {
@@ -351,16 +549,18 @@ def extract_ingredients_from_image(image_bytes: bytes) -> Dict[str, Any]:
 
     try:
         enhanced_bytes = preprocess_image_for_ocr(image_bytes)
-        results = READER.readtext(
-            enhanced_bytes,
-            detail=0,
-            paragraph=False,
-            width_ths=0.35,
-            mag_ratio=1.0
-        )
-        tokens = extract_and_normalize_tokens(results)
+        with OCR_LOCK:
+            detailed_results = READER.readtext(
+                enhanced_bytes,
+                detail=1,
+                paragraph=False,
+                width_ths=0.35,
+                mag_ratio=1.0
+            )
+        ordered_texts = sort_ocr_results_reading_order(detailed_results)
+        tokens = extract_and_normalize_tokens(ordered_texts)
         return {
-            "raw_text_blocks": results,
+            "raw_text_blocks": ordered_texts,
             "extracted_ingredients": tokens,
             "total_count": len(tokens)
         }

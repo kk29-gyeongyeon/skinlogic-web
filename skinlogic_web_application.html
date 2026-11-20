@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -7,7 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
   <style>
-    html, body {
+    html,
+    body {
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       background-color: #f8fafc;
       color: #1e293b;
@@ -15,27 +17,35 @@
       width: 100%;
       -webkit-tap-highlight-color: transparent;
     }
+
     .btn-primary {
       background-color: #0d9488;
     }
+
     .btn-primary:hover {
       background-color: #0f766e;
     }
+
     .btn-primary:active {
       background-color: #115e59;
     }
+
     .custom-scroll::-webkit-scrollbar {
       width: 5px;
       height: 5px;
     }
+
     .custom-scroll::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 3px;
     }
+
     .safe-bottom-nav {
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
+
     @media (max-width: 640px) {
+
       input[type="text"],
       input[type="password"],
       textarea,
@@ -43,8 +53,152 @@
         font-size: 14px !important;
       }
     }
+
+    /* 모바일 OCR 전성분 영역 드래그 크롭 & 카메라 가이드 스타일 */
+    .ocr-crop-rect {
+      position: absolute;
+      border: 2px solid #2dd4bf;
+      border-radius: 6px;
+      cursor: move;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+
+    .ocr-crop-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(45, 212, 191, 0.28) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(45, 212, 191, 0.28) 1px, transparent 1px);
+      background-size: 33.333% 33.333%;
+    }
+
+    .ocr-crop-tag {
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      pointer-events: none;
+      background: rgba(13, 148, 136, 0.9);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 5px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .ocr-handle {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      touch-action: none;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ocr-handle::after {
+      content: "";
+      display: block;
+      background: #ffffff;
+      border: 2.5px solid #0d9488;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+
+    .ocr-handle-nw {
+      top: -17px;
+      left: -17px;
+      cursor: nwse-resize;
+    }
+
+    .ocr-handle-ne {
+      top: -17px;
+      right: -17px;
+      cursor: nesw-resize;
+    }
+
+    .ocr-handle-sw {
+      bottom: -17px;
+      left: -17px;
+      cursor: nesw-resize;
+    }
+
+    .ocr-handle-se {
+      bottom: -17px;
+      right: -17px;
+      cursor: nwse-resize;
+    }
+
+    .ocr-handle-nw::after,
+    .ocr-handle-ne::after,
+    .ocr-handle-sw::after,
+    .ocr-handle-se::after {
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+    }
+
+    .ocr-handle-n {
+      top: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: ns-resize;
+    }
+
+    .ocr-handle-s {
+      bottom: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: ns-resize;
+    }
+
+    .ocr-handle-w {
+      top: 50%;
+      left: -17px;
+      transform: translateY(-50%);
+      cursor: ew-resize;
+    }
+
+    .ocr-handle-e {
+      top: 50%;
+      right: -17px;
+      transform: translateY(-50%);
+      cursor: ew-resize;
+    }
+
+    .ocr-handle-n::after,
+    .ocr-handle-s::after {
+      width: 26px;
+      height: 7px;
+      border-radius: 9999px;
+    }
+
+    .ocr-handle-w::after,
+    .ocr-handle-e::after {
+      width: 7px;
+      height: 26px;
+      border-radius: 9999px;
+    }
+
+    .camera-guide-window {
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      top: 19%;
+      bottom: 19%;
+      border: 2px solid #2dd4bf;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.58);
+      pointer-events: none;
+    }
   </style>
 </head>
+
 <body class="min-h-screen flex flex-col pb-20 md:pb-6">
 
   <!-- ==================== 상단 헤더 (PC 1줄 메뉴 & 모바일 간소화 헤더) ==================== -->
@@ -52,55 +206,74 @@
     <div class="max-w-7xl mx-auto px-3.5 sm:px-6 h-14 md:h-16 flex items-center justify-between gap-2">
       <!-- 로고 (홈 이동) -->
       <div onclick="switchTab('home')" class="flex items-center gap-2 cursor-pointer shrink-0 py-1">
-        <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
+        <div
+          class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
           SL
         </div>
         <div>
-          <span class="font-extrabold text-base md:text-lg tracking-tight text-slate-900 block leading-none">SkinLogic</span>
-          <span class="text-[10px] text-slate-400 font-semibold hidden sm:block mt-0.5">AI Skincare & Inner Beauty</span>
+          <span
+            class="font-extrabold text-base md:text-lg tracking-tight text-slate-900 block leading-none">SkinLogic</span>
+          <span class="text-[10px] text-slate-400 font-semibold hidden sm:block mt-0.5">AI Skincare & Inner
+            Beauty</span>
         </div>
       </div>
 
       <!-- PC 전용 1줄 핵심 메뉴 (모바일에서는 하단 고정 탭 바로 분리) -->
       <nav class="hidden md:flex items-center gap-1 lg:gap-1.5 shrink-0">
-        <button id="tab-btn-home" onclick="switchTab('home')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-bold bg-teal-50 text-teal-700 transition whitespace-nowrap">
+        <button id="tab-btn-home" onclick="switchTab('home')"
+          class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-bold bg-teal-50 text-teal-700 transition whitespace-nowrap">
           홈 대시보드
         </button>
-        <button id="tab-btn-scan" onclick="switchTab('scan')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
-          라벨 스캔 <span id="scan-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        <button id="tab-btn-scan" onclick="switchTab('scan')"
+          class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          라벨 스캔 <span id="scan-count-badge"
+            class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
         </button>
-        <button id="tab-btn-vanity" onclick="switchTab('vanity')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
-          내 화장대 <span id="vanity-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        <button id="tab-btn-vanity" onclick="switchTab('vanity')"
+          class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          내 화장대 <span id="vanity-count-badge"
+            class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
         </button>
-        <button id="tab-btn-ai" onclick="switchTab('ai')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
-          AI 루틴 · 이너뷰티 <span id="inner-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        <button id="tab-btn-ai" onclick="switchTab('ai')"
+          class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          AI 루틴 · 이너뷰티 <span id="inner-count-badge"
+            class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
         </button>
-        <button id="tab-btn-archive" onclick="switchTab('archive')" class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
-          리포트 보관함 <span id="archive-count-badge" class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
+        <button id="tab-btn-archive" onclick="switchTab('archive')"
+          class="px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition whitespace-nowrap">
+          리포트 보관함 <span id="archive-count-badge"
+            class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-500">0</span>
         </button>
       </nav>
 
       <!-- 우측 로그인 / 프로필 영역 -->
       <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <div id="header-auth-guest" class="flex items-center gap-1.5">
-          <button onclick="openAuthModal('LOGIN')" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition shadow-xs">
+          <button onclick="openAuthModal('LOGIN')"
+            class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition shadow-xs">
             로그인
           </button>
-          <button onclick="openAuthModal('SIGNUP')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          <button onclick="openAuthModal('SIGNUP')"
+            class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
             회원가입
           </button>
         </div>
 
         <div id="header-auth-user" class="hidden items-center gap-1.5 sm:gap-2">
-          <img id="header-user-avatar" src="" alt="프로필" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-teal-300 hidden shrink-0" />
-          <div id="header-user-avatar-fallback" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+          <img id="header-user-avatar" src="" alt="프로필"
+            class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-teal-300 hidden shrink-0" />
+          <div id="header-user-avatar-fallback"
+            class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
             U
           </div>
-          <span id="header-user-nickname" class="text-xs font-bold text-slate-800 max-w-[80px] sm:max-w-[120px] truncate">회원님</span>
-          <button onclick="openAccountModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+          <span id="header-user-nickname"
+            class="text-xs font-bold text-slate-800 max-w-[80px] sm:max-w-[120px] truncate">회원님</span>
+          <button onclick="openAccountModal()"
+            class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
             계정관리
           </button>
-          <button onclick="handleLogout()" class="px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-50 text-xs font-semibold">
+          <button onclick="handleLogout()"
+            class="px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-50 text-xs font-semibold">
             로그아웃
           </button>
         </div>
@@ -110,38 +283,49 @@
 
   <!-- ==================== 전역 상태 알림 토스트 배너 ==================== -->
   <div id="global-toast-banner" class="hidden max-w-7xl w-full mx-auto px-3.5 sm:px-6 pt-3">
-    <div id="global-toast-inner" class="p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
+    <div id="global-toast-inner"
+      class="p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
       <span id="global-toast-text"></span>
       <button onclick="hideGlobalToast()" class="px-1.5 py-0.5 opacity-70 hover:opacity-100 font-bold">✕</button>
     </div>
   </div>
 
   <!-- ==================== 모바일 전용 하단 고정 탭 네비게이션 ==================== -->
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom-nav shadow-lg">
+  <nav
+    class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom-nav shadow-lg">
     <div class="grid grid-cols-5 h-16">
-      <button id="mob-tab-btn-home" onclick="switchTab('home')" class="flex flex-col items-center justify-center gap-0.5 text-teal-600 font-bold">
+      <button id="mob-tab-btn-home" onclick="switchTab('home')"
+        class="flex flex-col items-center justify-center gap-0.5 text-teal-600 font-bold">
         <span class="text-base leading-none">🏠</span>
         <span class="text-[11px]">홈</span>
       </button>
-      <button id="mob-tab-btn-scan" onclick="switchTab('scan')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+      <button id="mob-tab-btn-scan" onclick="switchTab('scan')"
+        class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
         <span class="text-base leading-none">📷</span>
         <span class="text-[11px]">라벨스캔</span>
-        <span id="mob-scan-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+        <span id="mob-scan-count-badge"
+          class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
       </button>
-      <button id="mob-tab-btn-vanity" onclick="switchTab('vanity')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+      <button id="mob-tab-btn-vanity" onclick="switchTab('vanity')"
+        class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
         <span class="text-base leading-none">🧴</span>
         <span class="text-[11px]">내화장대</span>
-        <span id="mob-vanity-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+        <span id="mob-vanity-count-badge"
+          class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
       </button>
-      <button id="mob-tab-btn-ai" onclick="switchTab('ai')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+      <button id="mob-tab-btn-ai" onclick="switchTab('ai')"
+        class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
         <span class="text-base leading-none">✨</span>
         <span class="text-[11px]">AI·영양</span>
-        <span id="mob-inner-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+        <span id="mob-inner-count-badge"
+          class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
       </button>
-      <button id="mob-tab-btn-archive" onclick="switchTab('archive')" class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
+      <button id="mob-tab-btn-archive" onclick="switchTab('archive')"
+        class="relative flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium">
         <span class="text-base leading-none">🗂️</span>
         <span class="text-[11px]">보관함</span>
-        <span id="mob-archive-count-badge" class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
+        <span id="mob-archive-count-badge"
+          class="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">0</span>
       </button>
     </div>
   </nav>
@@ -158,20 +342,25 @@
       <div id="env-weather-card" class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3.5">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2 min-w-0">
-            <span class="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 font-extrabold text-xs sm:text-sm" id="env-card-region">경기도 수원시</span>
+            <span class="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 font-extrabold text-xs sm:text-sm"
+              id="env-card-region">경기도 수원시</span>
             <span class="text-slate-800 font-bold text-xs sm:text-sm" id="env-card-weather">기상 조회 중...</span>
-            <span id="env-source-badge" class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">데이터 확인 중</span>
+            <span id="env-source-badge"
+              class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">데이터 확인 중</span>
             <span class="text-[11px] text-slate-400" id="env-updated-time"></span>
           </div>
 
           <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
-            <button onclick="fetchRealtimeWeather(currentRegionKey)" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
+            <button onclick="fetchRealtimeWeather(currentRegionKey)"
+              class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
               🔄 갱신
             </button>
-            <button onclick="requestUserGpsWeather()" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
+            <button onclick="requestUserGpsWeather()"
+              class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition">
               📍 내 위치
             </button>
-            <select id="env-region-select" onchange="onRegionSelectChange(this.value)" class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-500">
+            <select id="env-region-select" onchange="onRegionSelectChange(this.value)"
+              class="min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-500">
               <option value="수원">수원</option>
               <option value="서울">서울</option>
               <option value="인천">인천</option>
@@ -198,7 +387,8 @@
           <div class="p-3 rounded-xl bg-amber-50/60 border border-amber-200/80 flex flex-col justify-between">
             <div class="flex items-center justify-between gap-1">
               <span class="text-[11px] text-amber-900 font-semibold">실시간 UV</span>
-              <span id="env-uv-level-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+              <span id="env-uv-level-badge"
+                class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
             </div>
             <div class="text-base sm:text-lg font-black text-slate-900 mt-1" id="env-card-uv">-</div>
           </div>
@@ -206,7 +396,8 @@
           <div class="p-3 rounded-xl bg-orange-50/60 border border-orange-200/80 flex flex-col justify-between">
             <div class="flex items-center justify-between gap-1">
               <span class="text-[11px] text-orange-900 font-semibold">오늘 최고 UV</span>
-              <span id="env-uv-max-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+              <span id="env-uv-max-badge"
+                class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
             </div>
             <div class="flex items-baseline justify-between gap-1 mt-1">
               <span class="text-base sm:text-lg font-black text-slate-900" id="env-card-uv-max">-</span>
@@ -214,10 +405,12 @@
             </div>
           </div>
 
-          <div class="col-span-2 sm:col-span-1 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+          <div
+            class="col-span-2 sm:col-span-1 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
             <div class="flex items-center justify-between gap-1">
               <span class="text-[11px] text-slate-500 font-semibold">초미세먼지</span>
-              <span id="env-pm25-badge" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
+              <span id="env-pm25-badge"
+                class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-extrabold">-</span>
             </div>
             <div class="text-base sm:text-lg font-black text-slate-900 mt-1" id="env-card-pm25">-</div>
           </div>
@@ -225,12 +418,14 @@
 
         <div id="env-status-notice-box" class="hidden p-3 rounded-xl text-xs leading-relaxed"></div>
 
-        <div id="env-rationale-container" class="p-3 rounded-xl bg-teal-50/50 border border-teal-200/80 space-y-2 text-xs">
+        <div id="env-rationale-container"
+          class="p-3 rounded-xl bg-teal-50/50 border border-teal-200/80 space-y-2 text-xs">
           <div class="flex items-start sm:items-center justify-between gap-2">
             <div class="text-slate-800 leading-relaxed font-medium" id="env-primary-tip-text">
               실시간 기상·UV 데이터를 불러오는 중입니다...
             </div>
-            <button type="button" onclick="togglePairDetail('env-rationale-detail-list')" class="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-teal-700 text-[11px] font-bold hover:bg-teal-50">
+            <button type="button" onclick="togglePairDetail('env-rationale-detail-list')"
+              class="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-teal-700 text-[11px] font-bold hover:bg-teal-50">
               추천 근거 ▾
             </button>
           </div>
@@ -246,7 +441,8 @@
             <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-vanity-count">0종 등록됨</div>
             <p class="text-xs text-slate-500 mt-1.5 line-clamp-2" id="dash-vanity-desc">등록된 화장품이 없습니다.</p>
           </div>
-          <button onclick="switchTab('vanity')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          <button onclick="switchTab('vanity')"
+            class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
             화장대 관리 →
           </button>
         </div>
@@ -257,7 +453,8 @@
             <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-conflict-title">주의 조합 0건</div>
             <p class="text-xs text-slate-500 mt-1.5" id="dash-conflict-desc">제품 2종 이상 등록 시 자동 분석됩니다.</p>
           </div>
-          <button onclick="switchTab('scan')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          <button onclick="switchTab('scan')"
+            class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
             라벨 스캔 · 상극 확인 →
           </button>
         </div>
@@ -268,7 +465,8 @@
             <div class="text-xl sm:text-2xl font-black text-teal-700" id="dash-skin-concern">미설정</div>
             <p class="text-xs text-slate-500 mt-1.5" id="dash-skin-style">피부 유형과 고민을 선택해 주세요.</p>
           </div>
-          <button onclick="switchTab('ai')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          <button onclick="switchTab('ai')"
+            class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
             유형 · 영양제 설정 →
           </button>
         </div>
@@ -279,7 +477,8 @@
             <div class="text-xl sm:text-2xl font-black text-slate-900" id="dash-ai-score">분석 전</div>
             <p class="text-xs text-slate-500 mt-1.5" id="dash-ai-desc">AI 맞춤 루틴 추천을 실행해 보세요.</p>
           </div>
-          <button onclick="switchTab('ai')" class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl btn-primary text-white text-xs font-bold transition shadow-xs">
+          <button onclick="switchTab('ai')"
+            class="mt-4 w-full min-h-[42px] sm:min-h-0 py-2.5 sm:py-2 rounded-xl btn-primary text-white text-xs font-bold transition shadow-xs">
             AI 루틴 추천 이동 →
           </button>
         </div>
@@ -290,7 +489,9 @@
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-extrabold text-slate-900">☀️ 오늘의 아침(AM) 루틴</h3>
-            <button onclick="switchTab('ai')" class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집 →</button>
+            <button onclick="switchTab('ai')"
+              class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집
+              →</button>
           </div>
           <div id="dash-am-routine-list" class="space-y-2 text-xs"></div>
         </div>
@@ -298,7 +499,9 @@
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-extrabold text-slate-900">🌙 오늘의 저녁(PM) 루틴</h3>
-            <button onclick="switchTab('ai')" class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집 →</button>
+            <button onclick="switchTab('ai')"
+              class="px-2.5 py-1 rounded-lg bg-teal-50 text-xs text-teal-700 font-bold hover:bg-teal-100">상세 · 편집
+              →</button>
           </div>
           <div id="dash-pm-routine-list" class="space-y-2 text-xs"></div>
         </div>
@@ -308,7 +511,9 @@
       <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-extrabold text-slate-900">🗂️ 최근 분석 리포트</h3>
-          <button onclick="switchTab('archive')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-600 font-bold hover:bg-slate-200">전체 보관함 →</button>
+          <button onclick="switchTab('archive')"
+            class="px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-600 font-bold hover:bg-slate-200">전체 보관함
+            →</button>
         </div>
         <div id="dash-recent-reports-box" class="text-xs"></div>
       </div>
@@ -322,96 +527,213 @@
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4 shadow-2xs">
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-extrabold text-sm sm:text-base text-slate-900">화장품 라벨 스캔 및 분석 목록</h2>
-            <span id="replace-mode-indicator" class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
+            <span id="replace-mode-indicator"
+              class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
               교체 모드 <button onclick="cancelReplaceMode()" class="ml-1 underline">취소</button>
             </span>
           </div>
 
-          <!-- 1. 라벨 사진 촬영 & OCR 자동 인식 및 사용자 확인/수정 폼 -->
+          <!-- 1. 라벨 사진 촬영 & 전성분 영역 크롭 · OCR 자동 인식 및 사용자 확인/수정 폼 -->
           <div class="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3.5">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-bold text-slate-800">1. 사진 촬영 · OCR 자동 인식 및 등록</span>
-              <span id="camera-facing-badge" class="px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold">후면 카메라 우선</span>
+              <span class="text-xs font-bold text-slate-800">1. 사진 촬영 · 전성분 영역 지정 OCR</span>
+              <span id="camera-facing-badge"
+                class="px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold">전성분 크롭 지원</span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button type="button" onclick="startWebCamera()" class="min-h-[46px] py-3 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition">
-                <span>📸 카메라로 직접 촬영</span>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="startWebCamera()"
+                class="min-h-[46px] py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition">
+                <span>📸 실시간 카메라</span>
               </button>
 
-              <label for="ocr-file-input" class="min-h-[46px] py-3 px-3.5 rounded-xl bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
-                <span>🖼️ 갤러리 사진 선택</span>
+              <label for="ocr-native-camera-input"
+                class="min-h-[46px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 active:bg-slate-950 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition text-center">
+                <span>📱 기본 카메라 촬영</span>
               </label>
             </div>
 
-            <input id="ocr-file-input" type="file" accept="image/*" class="hidden" onchange="handleOcrFileSelect(event)" />
-            <input id="ocr-native-camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleOcrFileSelect(event)" />
+            <label for="ocr-file-input"
+              class="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+              <span>🖼️ 갤러리에서 사진 선택 (촬영 후 전성분 영역 자르기)</span>
+            </label>
+
+            <input id="ocr-file-input" type="file" accept="image/*" class="hidden"
+              onchange="handleOcrFileSelect(event, 'gallery')" />
+            <input id="ocr-native-camera-input" type="file" accept="image/*" capture="environment" class="hidden"
+              onchange="handleOcrFileSelect(event, 'native')" />
             <canvas id="camera-capture-canvas" class="hidden"></canvas>
 
-            <!-- [A] 웹 화면 내 실시간 카메라 미리보기 뷰포트 -->
-            <div id="camera-live-container" class="hidden rounded-2xl overflow-hidden border-2 border-teal-500 bg-slate-950 shadow-md">
-              <div class="relative w-full h-64 sm:h-72 bg-black flex items-center justify-center">
+            <!-- [A] 웹 화면 내 실시간 카메라 미리보기 뷰포트 (가이드 박스 영역 실제 크롭 연동) -->
+            <div id="camera-live-container"
+              class="hidden rounded-2xl overflow-hidden border-2 border-teal-500 bg-slate-950 shadow-md">
+              <div id="camera-viewport-wrapper"
+                class="relative w-full h-80 sm:h-96 bg-black flex items-center justify-center overflow-hidden select-none">
                 <video id="camera-video-el" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                <div class="pointer-events-none absolute inset-4 border-2 border-dashed border-teal-300/80 rounded-xl flex flex-col justify-between p-2.5">
-                  <div class="flex items-center justify-between text-[11px] font-bold text-white bg-slate-900/60 px-2.5 py-1 rounded-lg backdrop-blur-xs">
-                    <span id="camera-stream-label">📷 후면 카메라 작동 중</span>
-                    <span class="text-teal-300">제품명/전성분을 사각형 안에 맞춰주세요</span>
-                  </div>
-                  <div class="text-center text-[11px] text-white/90 bg-slate-900/50 py-1 rounded-lg">
-                    촬영 즉시 브랜드·제품명·전성분·제형이 자동 추출됩니다
-                  </div>
+                <!-- 어두운 마스킹 + 중앙 전성분 스캔 가이드 박스 (실제 크롭 좌표 연동) -->
+                <div id="camera-guide-box" class="camera-guide-window">
+                  <span
+                    class="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-[3px] border-l-[3px] border-teal-300 rounded-tl-md"></span>
+                  <span
+                    class="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-[3px] border-r-[3px] border-teal-300 rounded-tr-md"></span>
+                  <span
+                    class="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-[3px] border-l-[3px] border-teal-300 rounded-bl-md"></span>
+                  <span
+                    class="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-[3px] border-r-[3px] border-teal-300 rounded-br-md"></span>
+                </div>
+                <div
+                  class="pointer-events-none absolute top-2.5 inset-x-3 flex items-center justify-between text-[11px] font-bold text-white bg-slate-900/75 px-2.5 py-1 rounded-lg backdrop-blur-xs">
+                  <span id="camera-stream-label">📷 후면 카메라</span>
+                  <span class="text-teal-300">밝은 네모 안에 전성분만 맞춰주세요</span>
+                </div>
+                <div
+                  class="pointer-events-none absolute bottom-2.5 inset-x-3 text-center text-[11px] text-white/95 bg-slate-900/70 py-1 px-2 rounded-lg">
+                  네모 안쪽만 자동 잘라내기 되어 인식률이 높아집니다
                 </div>
               </div>
 
+              <!-- 지원 기기용 카메라 확대(줌) 슬라이더 -->
+              <div id="camera-zoom-bar"
+                class="hidden px-3 py-2 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2 text-[11px] text-slate-200">
+                <span class="font-bold shrink-0">🔍 확대</span>
+                <input id="camera-zoom-slider" type="range" min="1" max="3" step="0.1" value="1"
+                  oninput="applyCameraZoom(this.value)" class="flex-1 accent-teal-400" />
+                <span id="camera-zoom-label" class="font-mono text-teal-300 w-9 text-right">1.0x</span>
+              </div>
+
               <div class="p-3 bg-slate-900 flex items-center justify-between gap-2">
-                <button type="button" onclick="switchCameraFacingMode()" class="min-h-[40px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
-                  🔄 전/후면 전환
+                <button type="button" onclick="switchCameraFacingMode()"
+                  class="min-h-[42px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
+                  🔄 전환
                 </button>
-                <button type="button" onclick="capturePhotoFromVideo()" class="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs sm:text-sm shadow-md transition">
-                  📸 사진 찍기 (자동 인식)
+                <button type="button" onclick="capturePhotoFromVideo()"
+                  class="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-teal-500 hover:bg-teal-400 active:bg-teal-600 text-slate-950 font-black text-xs sm:text-sm shadow-md transition">
+                  📸 네모 영역 촬영 · 인식
                 </button>
-                <button type="button" onclick="stopWebCamera()" class="min-h-[40px] px-3 py-2 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold transition">
+                <button type="button" onclick="stopWebCamera()"
+                  class="min-h-[42px] px-3 py-2 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold transition">
                   ✕ 닫기
                 </button>
               </div>
             </div>
 
             <!-- [B] 카메라 권한 거부 또는 사용 불가 환경 안내 및 폴백 박스 -->
-            <div id="camera-error-box" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2.5 text-xs">
+            <div id="camera-error-box"
+              class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2.5 text-xs">
               <div class="font-extrabold text-amber-900 flex items-center justify-between">
                 <span id="camera-error-title">⚠️ 웹 카메라 미리보기를 실행할 수 없습니다</span>
                 <button type="button" onclick="hideCameraErrorBox()" class="text-amber-700 font-bold px-1">✕</button>
               </div>
               <p id="camera-error-msg" class="text-amber-800 leading-relaxed text-[11px]"></p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                <label for="ocr-native-camera-input" class="min-h-[40px] py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
+                <label for="ocr-native-camera-input"
+                  class="min-h-[40px] py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
                   📱 기기 기본 카메라 앱으로 촬영
                 </label>
-                <label for="ocr-file-input" class="min-h-[40px] py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-amber-300 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
+                <label for="ocr-file-input"
+                  class="min-h-[40px] py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-amber-300 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
                   🖼️ 갤러리에서 사진 선택
                 </label>
               </div>
             </div>
 
-            <!-- [C] 촬영 / 선택된 사진 미리보기 박스 -->
-            <div id="ocr-photo-preview-box" class="hidden p-3 rounded-xl bg-white border border-teal-400 space-y-2.5 shadow-2xs">
+            <!-- [C-1] 손가락 드래그 전성분 영역 자르기(Crop) 에디터 -->
+            <div id="ocr-cropper-box"
+              class="hidden p-3 rounded-xl bg-white border-2 border-teal-500 space-y-3 shadow-sm">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span id="ocr-cropper-title" class="text-xs font-extrabold text-teal-800 block">✂️ 전성분 영역 자르기 (손가락으로
+                    드래그)</span>
+                  <span class="text-[11px] text-slate-500 leading-snug block mt-0.5">모서리·변을 끌어 <b
+                      class="text-slate-700">전성분 글씨 부분만</b> 크게 맞춰주세요</span>
+                </div>
+                <button type="button" onclick="closeOcrCropper()"
+                  class="text-slate-400 hover:text-slate-600 font-bold text-sm px-1.5 py-0.5">✕</button>
+              </div>
+
+              <div id="ocr-crop-stage-outer"
+                class="relative w-full rounded-xl bg-slate-950 flex items-center justify-center overflow-hidden p-3.5 select-none"
+                style="touch-action: none;">
+                <div id="ocr-crop-stage" class="relative inline-block select-none leading-none"
+                  style="touch-action: none;">
+                  <img id="ocr-crop-source-img" src="" alt="전성분 영역 지정용 사진" draggable="false"
+                    class="block max-w-full max-h-[50vh] w-auto h-auto select-none pointer-events-none rounded-xs" />
+                  <div class="absolute inset-0 overflow-hidden pointer-events-none rounded-xs">
+                    <div id="ocr-crop-mask" class="absolute" style="box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.62);">
+                    </div>
+                  </div>
+                  <div id="ocr-crop-rect" class="ocr-crop-rect" data-action="move">
+                    <div class="ocr-crop-grid"></div>
+                    <span class="ocr-crop-tag">전성분 영역</span>
+                    <div class="ocr-handle ocr-handle-nw" data-action="nw"></div>
+                    <div class="ocr-handle ocr-handle-ne" data-action="ne"></div>
+                    <div class="ocr-handle ocr-handle-sw" data-action="sw"></div>
+                    <div class="ocr-handle ocr-handle-se" data-action="se"></div>
+                    <div class="ocr-handle ocr-handle-n" data-action="n"></div>
+                    <div class="ocr-handle ocr-handle-s" data-action="s"></div>
+                    <div class="ocr-handle ocr-handle-w" data-action="w"></div>
+                    <div class="ocr-handle ocr-handle-e" data-action="e"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-1.5">
+                <button type="button" onclick="rotateOcrCropImage(90)"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                  ↻ 90° 회전
+                </button>
+                <button type="button" onclick="setOcrCropPreset('default')"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                  🎯 기본 영역
+                </button>
+                <button type="button" onclick="setOcrCropPreset('full')"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                  ⛶ 전체 선택
+                </button>
+              </div>
+
+              <div class="flex gap-2">
+                <button type="button" id="btn-run-cropped-ocr" onclick="confirmOcrCropAndExtract()"
+                  class="flex-1 min-h-[46px] py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs sm:text-sm shadow-sm transition">
+                  🔍 선택한 전성분 영역 인식하기
+                </button>
+                <label for="ocr-file-input"
+                  class="min-h-[46px] py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer shrink-0">
+                  🖼️ 변경
+                </label>
+              </div>
+            </div>
+
+            <!-- [C-2] 크롭·분석된 사진 미리보기 박스 -->
+            <div id="ocr-photo-preview-box"
+              class="hidden p-3 rounded-xl bg-white border border-teal-400 space-y-2.5 shadow-2xs">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-extrabold text-teal-800" id="ocr-preview-source-badge">📸 촬영된 사진 미리보기</span>
-                <span class="text-[11px] text-slate-400 truncate max-w-[150px]" id="ocr-preview-filename"></span>
+                <span class="text-xs font-extrabold text-teal-800" id="ocr-preview-source-badge">📸 분석된 전성분 영역
+                  미리보기</span>
+                <span class="text-[11px] text-slate-400 truncate max-w-[140px]" id="ocr-preview-filename"></span>
               </div>
 
-              <div class="relative rounded-xl overflow-hidden bg-slate-900 max-h-48 flex items-center justify-center border border-slate-200">
-                <img id="ocr-photo-preview-img" src="" alt="촬영 사진 미리보기" class="max-h-44 w-auto object-contain mx-auto" />
+              <div
+                class="relative rounded-xl overflow-hidden bg-slate-900 max-h-48 flex items-center justify-center border border-slate-200">
+                <img id="ocr-photo-preview-img" src="" alt="크롭된 전성분 사진 미리보기"
+                  class="max-h-44 w-auto object-contain mx-auto" />
               </div>
 
-              <div class="grid grid-cols-3 gap-2">
-                <button type="button" onclick="retakeWebCameraPhoto()" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                <button type="button" onclick="reopenOcrCropper()"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 font-bold text-xs">
+                  ✂️ 영역 다시 자르기
+                </button>
+                <button type="button" onclick="retakeWebCameraPhoto()"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
                   📸 다시 촬영
                 </button>
-                <label for="ocr-file-input" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer">
+                <label for="ocr-file-input"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer">
                   🖼️ 다른 사진
                 </label>
-                <button type="button" onclick="clearOcrPhotoPreview()" class="min-h-[36px] py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs">
+                <button type="button" onclick="clearOcrPhotoPreview()"
+                  class="min-h-[38px] py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs">
                   ✕ 사진 지우기
                 </button>
               </div>
@@ -421,7 +743,8 @@
             <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
               <div class="flex flex-wrap items-center justify-between gap-1.5">
                 <span class="text-xs font-extrabold text-slate-800">인식 결과 확인 · 수정 (또는 직접 수동 입력)</span>
-                <span id="ocr-recognition-mode-badge" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
+                <span id="ocr-recognition-mode-badge"
+                  class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
                   사진 대기 / 수동 입력 가능
                 </span>
               </div>
@@ -432,18 +755,21 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label class="block text-[11px] font-bold text-slate-600 mb-1">브랜드명</label>
-                  <input id="ocr-brand-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 라운드랩, 토리든" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                  <input id="ocr-brand-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 라운드랩, 토리든"
+                    class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
                 </div>
                 <div>
                   <label class="block text-[11px] font-bold text-slate-600 mb-1">제품명</label>
-                  <input id="ocr-name-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 자작나무 수분 선크림" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                  <input id="ocr-name-input" type="text" oninput="onOcrFieldManualEdit()" placeholder="예: 자작나무 수분 선크림"
+                    class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
                 </div>
               </div>
 
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div class="flex-1">
                   <label class="block text-[11px] font-bold text-slate-600 mb-1">제품 제형</label>
-                  <select id="ocr-type-select" class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium focus:outline-none focus:border-teal-500">
+                  <select id="ocr-type-select"
+                    class="w-full min-h-[40px] sm:min-h-0 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium focus:outline-none focus:border-teal-500">
                     <option value="AUTO">제형 자동 판별</option>
                     <option value="스킨/토너">스킨/토너</option>
                     <option value="토너패드">토너패드</option>
@@ -467,12 +793,16 @@
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <label class="text-[11px] font-bold text-slate-600">추출된 전성분 (직접 확인 · 수정 가능)</label>
-                  <button type="button" onclick="resetOcrFormFields()" class="text-[11px] text-slate-400 hover:text-slate-600 underline">입력 초기화</button>
+                  <button type="button" onclick="resetOcrFormFields()"
+                    class="text-[11px] text-slate-400 hover:text-slate-600 underline">입력 초기화</button>
                 </div>
-                <textarea id="ocr-ingredients-input" rows="2" placeholder="사진 촬영 시 전성분이 자동 입력되며, 직접 수정하거나 수동으로 입력(쉼표 구분)할 수 있습니다." class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 leading-relaxed custom-scroll"></textarea>
+                <textarea id="ocr-ingredients-input" rows="2"
+                  placeholder="사진 촬영 시 전성분이 자동 입력되며, 직접 수정하거나 수동으로 입력(쉼표 구분)할 수 있습니다."
+                  class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 leading-relaxed custom-scroll"></textarea>
               </div>
 
-              <button type="button" id="btn-confirm-ocr-save" onclick="confirmAndSaveOcrProduct()" class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs sm:text-sm shadow-xs transition">
+              <button type="button" id="btn-confirm-ocr-save" onclick="confirmAndSaveOcrProduct()"
+                class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs sm:text-sm shadow-xs transition">
                 ✓ 확인 완료 · 분석 목록 및 DB 등록
               </button>
             </div>
@@ -480,7 +810,8 @@
             <div class="flex items-center justify-between text-[11px] text-slate-500 px-1">
               <span id="ocr-status-badge">사진을 촬영/선택하면 브랜드·제품명·전성분·제형이 자동 추출됩니다.</span>
             </div>
-            <div id="ocr-db-result-box" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs break-words"></div>
+            <div id="ocr-db-result-box"
+              class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs break-words"></div>
           </div>
 
           <!-- 2. DB 화장품 검색 (다중 결과 리스트 및 동일 제형 [교체] / [+ 추가] 동시 제공) -->
@@ -490,24 +821,35 @@
               <span class="text-[11px] text-slate-400" id="scan-search-count-label">검색 결과 표시</span>
             </div>
             <div class="flex gap-1.5">
-              <input id="scan-cosmetic-input" type="text" oninput="searchCosmeticForScan(this.value)" placeholder="🔍 브랜드, 제품명, 성분 검색 (예: 레티놀, 비타민C, 토리든)..." class="flex-1 min-h-[42px] sm:min-h-0 px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-              <button type="button" onclick="searchCosmeticForScan(document.getElementById('scan-cosmetic-input').value)" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0">
+              <input id="scan-cosmetic-input" type="text" oninput="searchCosmeticForScan(this.value)"
+                placeholder="🔍 브랜드, 제품명, 성분 검색 (예: 레티놀, 비타민C, 토리든)..."
+                class="flex-1 min-h-[42px] sm:min-h-0 px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button"
+                onclick="searchCosmeticForScan(document.getElementById('scan-cosmetic-input').value)"
+                class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0">
                 검색
               </button>
             </div>
-            <div id="scan-cosmetic-results-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-60 overflow-y-auto p-2 custom-scroll border border-slate-200/80 rounded-xl bg-slate-50/60"></div>
+            <div id="scan-cosmetic-results-list"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-60 overflow-y-auto p-2 custom-scroll border border-slate-200/80 rounded-xl bg-slate-50/60">
+            </div>
           </div>
 
           <!-- 선택된 제품 목록 -->
           <div class="pt-3 border-t border-slate-100">
             <div class="flex items-center justify-between mb-2.5">
-              <span class="text-xs font-bold text-slate-800">선택된 분석 목록 (<span id="scan-list-count" class="text-teal-600">0</span>개)</span>
-              <button onclick="clearScanProductList()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
+              <span class="text-xs font-bold text-slate-800">선택된 분석 목록 (<span id="scan-list-count"
+                  class="text-teal-600">0</span>개)</span>
+              <button onclick="clearScanProductList()"
+                class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
             </div>
-            <div id="scan-selected-products-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-72 overflow-y-auto custom-scroll pr-0.5"></div>
+            <div id="scan-selected-products-list"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-72 overflow-y-auto custom-scroll pr-0.5">
+            </div>
           </div>
 
-          <button onclick="runTab1MultiAnalysis()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+          <button onclick="runTab1MultiAnalysis()"
+            class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
             선택 제품 교차 상극 분석 실행
           </button>
         </div>
@@ -515,7 +857,9 @@
 
       <!-- 우측 분석 결과 패널 -->
       <div class="lg:col-span-7">
-        <div id="scan-result-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs"></div>
+        <div id="scan-result-panel"
+          class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs">
+        </div>
       </div>
     </div>
 
@@ -527,38 +871,53 @@
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4 shadow-2xs">
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-extrabold text-sm sm:text-base text-slate-900">내 화장대 제품 등록 및 관리</h2>
-            <span id="vanity-replace-indicator" class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
+            <span id="vanity-replace-indicator"
+              class="hidden px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
               교체 대상 선택됨 <button onclick="cancelVanityReplaceMode()" class="ml-1 underline">취소</button>
             </span>
           </div>
 
           <div class="flex flex-wrap gap-1.5">
-            <button onclick="filterCosmeticCategory('')" id="cat-btn-all" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 text-white transition">전체</button>
-            <button onclick="filterCosmeticCategory('Skincare')" id="cat-btn-Skincare" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">스킨케어</button>
-            <button onclick="filterCosmeticCategory('Cleansing')" id="cat-btn-Cleansing" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">클렌징</button>
-            <button onclick="filterCosmeticCategory('MaskPack')" id="cat-btn-MaskPack" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">마스크팩</button>
-            <button onclick="filterCosmeticCategory('SunCare')" id="cat-btn-SunCare" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">선케어</button>
+            <button onclick="filterCosmeticCategory('')" id="cat-btn-all"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 text-white transition">전체</button>
+            <button onclick="filterCosmeticCategory('Skincare')" id="cat-btn-Skincare"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">스킨케어</button>
+            <button onclick="filterCosmeticCategory('Cleansing')" id="cat-btn-Cleansing"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">클렌징</button>
+            <button onclick="filterCosmeticCategory('MaskPack')" id="cat-btn-MaskPack"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">마스크팩</button>
+            <button onclick="filterCosmeticCategory('SunCare')" id="cat-btn-SunCare"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">선케어</button>
           </div>
 
-          <input id="routine-cosmetic-search" type="text" oninput="loadCosmeticList()" placeholder="🔍 브랜드, 제품명, 성분 검색..." class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+          <input id="routine-cosmetic-search" type="text" oninput="loadCosmeticList()"
+            placeholder="🔍 브랜드, 제품명, 성분 검색..."
+            class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
 
           <div>
             <div class="text-[11px] font-semibold text-slate-400 mb-1.5">DB 화장품 목록 (동일 제형 보유 시 [교체] · [+ 추가] 지원)</div>
-            <div id="routine-cosmetic-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-2 custom-scroll border border-slate-100 rounded-xl bg-slate-50/60"></div>
+            <div id="routine-cosmetic-list"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-2 custom-scroll border border-slate-100 rounded-xl bg-slate-50/60">
+            </div>
           </div>
 
           <div class="pt-3 border-t border-slate-100">
             <div class="flex items-center justify-between text-xs mb-2.5">
               <span class="font-bold text-slate-800">보유 화장품 목록 (클릭 시 조합 필터)</span>
-              <button onclick="clearVanityBasket()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
+              <button onclick="clearVanityBasket()"
+                class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">전체 비우기</button>
             </div>
-            <div id="vanity-basket-chips" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-60 overflow-y-auto custom-scroll pr-0.5"></div>
+            <div id="vanity-basket-chips"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 max-h-60 overflow-y-auto custom-scroll pr-0.5">
+            </div>
           </div>
         </div>
       </div>
 
       <div class="lg:col-span-7">
-        <div id="vanity-auto-conflict-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs"></div>
+        <div id="vanity-auto-conflict-panel"
+          class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] shadow-2xs">
+        </div>
       </div>
     </div>
 
@@ -575,22 +934,28 @@
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-2">내 피부 유형 (6대 유형)</label>
             <div class="grid grid-cols-3 gap-2" id="skin-type-btn-group">
-              <button type="button" onclick="selectSkinType('수부지')" data-stype="수부지" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-bold transition bg-teal-600 text-white border-teal-700 shadow-2xs">
+              <button type="button" onclick="selectSkinType('수부지')" data-stype="수부지"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-bold transition bg-teal-600 text-white border-teal-700 shadow-2xs">
                 수부지
               </button>
-              <button type="button" onclick="selectSkinType('건성')" data-stype="건성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+              <button type="button" onclick="selectSkinType('건성')" data-stype="건성"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
                 건성
               </button>
-              <button type="button" onclick="selectSkinType('지성')" data-stype="지성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+              <button type="button" onclick="selectSkinType('지성')" data-stype="지성"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
                 지성
               </button>
-              <button type="button" onclick="selectSkinType('복합성')" data-stype="복합성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+              <button type="button" onclick="selectSkinType('복합성')" data-stype="복합성"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
                 복합성
               </button>
-              <button type="button" onclick="selectSkinType('민감성')" data-stype="민감성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+              <button type="button" onclick="selectSkinType('민감성')" data-stype="민감성"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
                 민감성
               </button>
-              <button type="button" onclick="selectSkinType('여드름성')" data-stype="여드름성" class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
+              <button type="button" onclick="selectSkinType('여드름성')" data-stype="여드름성"
+                class="skin-type-btn min-h-[42px] py-2.5 px-2.5 rounded-xl border text-xs font-semibold transition bg-slate-50 text-slate-700 border-slate-200 hover:border-teal-400">
                 여드름성
               </button>
             </div>
@@ -599,7 +964,8 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">피부 고민</label>
-              <select id="routine-concern-select" onchange="onRoutinePrefChange()" class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
+              <select id="routine-concern-select" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
                 <option value="수분/속건조">수분/속건조</option>
                 <option value="미백/잡티">미백/잡티</option>
                 <option value="트러블/피지">트러블/피지</option>
@@ -611,7 +977,8 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">선호 케어 단계</label>
-              <select id="routine-style-select" onchange="onRoutinePrefChange()" class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
+              <select id="routine-style-select" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[42px] sm:min-h-0 px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:outline-none focus:border-teal-500">
                 <option value="1">1단계: 올인원 미니멀</option>
                 <option value="2">2단계: 실속 에센셜</option>
                 <option value="3" selected>3~4단계: 밸런스 정석</option>
@@ -624,7 +991,8 @@
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
             <div>
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">메이크업</label>
-              <select id="life-makeup" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+              <select id="life-makeup" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
                 <option value="0">안 함</option>
                 <option value="1" selected>선크림만</option>
                 <option value="2">풀메이크업</option>
@@ -632,7 +1000,8 @@
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">수면 시간</label>
-              <select id="life-sleep" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+              <select id="life-sleep" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
                 <option value="0">6시간 미만</option>
                 <option value="1" selected>6~7시간</option>
                 <option value="2">7시간 이상</option>
@@ -640,7 +1009,8 @@
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">야외 활동</label>
-              <select id="life-outdoor" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+              <select id="life-outdoor" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
                 <option value="0">실내 위주</option>
                 <option value="1" selected>일반 출퇴근</option>
                 <option value="2">야외 많음</option>
@@ -648,7 +1018,8 @@
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">음주 빈도</label>
-              <select id="life-alcohol" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+              <select id="life-alcohol" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
                 <option value="0" selected>안 함</option>
                 <option value="1">주 1~2회</option>
                 <option value="2">주 3회 이상</option>
@@ -656,7 +1027,8 @@
             </div>
             <div class="col-span-2 sm:col-span-2">
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">운동 빈도</label>
-              <select id="life-workout" onchange="onRoutinePrefChange()" class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
+              <select id="life-workout" onchange="onRoutinePrefChange()"
+                class="w-full min-h-[40px] sm:min-h-0 px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50">
                 <option value="0">거의 안 함</option>
                 <option value="1" selected>주 1~2회 가벼운 운동</option>
                 <option value="2">고강도 운동 (땀 배출 많음)</option>
@@ -669,15 +1041,18 @@
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3.5 shadow-2xs">
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-extrabold text-sm sm:text-base text-slate-900">2. 이너뷰티 영양제 설정</h2>
-            <button onclick="clearSupplements()" class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">복용 목록 비우기</button>
+            <button onclick="clearSupplements()"
+              class="px-2 py-1 rounded text-xs text-rose-500 font-semibold hover:bg-rose-50">복용 목록 비우기</button>
           </div>
 
-          <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between gap-2">
+          <div
+            class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between gap-2">
             <div>
               <div class="text-xs font-bold text-emerald-950">AI 신규 영양제 추천 개수</div>
               <div class="text-[11px] text-emerald-700">우선순위 상위 영양소를 중복 없이 추천</div>
             </div>
-            <select id="supplement-limit-select" onchange="onRoutinePrefChange()" class="min-h-[38px] px-3 py-1.5 text-xs rounded-xl border border-emerald-300 bg-white font-bold text-emerald-900 focus:outline-none focus:border-teal-600 shrink-0">
+            <select id="supplement-limit-select" onchange="onRoutinePrefChange()"
+              class="min-h-[38px] px-3 py-1.5 text-xs rounded-xl border border-emerald-300 bg-white font-bold text-emerald-900 focus:outline-none focus:border-teal-600 shrink-0">
               <option value="1">1개 추천</option>
               <option value="2">2개 추천</option>
               <option value="3" selected>3개 추천</option>
@@ -686,21 +1061,28 @@
           </div>
 
           <div class="relative">
-            <input id="supp-search-input" type="text" oninput="handleSupplementSearch(this.value)" placeholder="🔍 현재 복용 중인 영양제 검색 (예: 비타민, 칼슘, 마그네슘)..." class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-            <div id="supp-search-dropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-20 custom-scroll"></div>
+            <input id="supp-search-input" type="text" oninput="handleSupplementSearch(this.value)"
+              placeholder="🔍 현재 복용 중인 영양제 검색 (예: 비타민, 칼슘, 마그네슘)..."
+              class="w-full min-h-[42px] sm:min-h-0 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+            <div id="supp-search-dropdown"
+              class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-20 custom-scroll">
+            </div>
           </div>
 
           <div id="selected-supp-chips" class="flex flex-wrap gap-2 min-h-[32px]"></div>
         </div>
 
-        <button id="btn-run-ai-routine" onclick="runTab2AiRoutine()" class="w-full min-h-[48px] py-3.5 rounded-2xl btn-primary text-white font-bold text-sm shadow-sm transition">
+        <button id="btn-run-ai-routine" onclick="runTab2AiRoutine()"
+          class="w-full min-h-[48px] py-3.5 rounded-2xl btn-primary text-white font-bold text-sm shadow-sm transition">
           AI 맞춤 루틴 & 이너뷰티 추천 실행
         </button>
       </div>
 
       <!-- 우측 통합 결과 패널 -->
       <div class="lg:col-span-7">
-        <div id="routine-result-panel" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] flex flex-col items-center justify-center text-center shadow-2xs"></div>
+        <div id="routine-result-panel"
+          class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 min-h-[420px] lg:min-h-[540px] flex flex-col items-center justify-center text-center shadow-2xs">
+        </div>
       </div>
     </div>
 
@@ -714,13 +1096,15 @@
             <h2 class="text-sm sm:text-base font-extrabold text-slate-900">저장된 분석 리포트 보관함</h2>
             <p class="text-[11px] text-slate-400 mt-0.5" id="archive-page-status-text">총 0건의 분석 리포트</p>
           </div>
-          <button onclick="clearArchive()" class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold hover:bg-rose-50">
+          <button onclick="clearArchive()"
+            class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold hover:bg-rose-50">
             전체 비우기
           </button>
         </div>
         <div id="archive-comparison-box"></div>
         <div id="archive-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-        <div id="archive-pagination-bar" class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-1.5"></div>
+        <div id="archive-pagination-bar"
+          class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-1.5"></div>
       </div>
     </div>
 
@@ -729,21 +1113,27 @@
   <!-- ===================================================================== -->
   <!-- [MODAL 1] 로그인 / 회원가입 / ID·PW 찾기 모달 (PC·모바일 완벽 중앙 정렬) -->
   <!-- ===================================================================== -->
-  <div id="auth-modal-backdrop" onclick="if(event.target===this) closeAuthModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
+  <div id="auth-modal-backdrop" onclick="if(event.target===this) closeAuthModal()"
+    class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
     <div class="min-h-full flex items-center justify-center p-3.5 sm:p-6">
-      <div class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div
+        class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 id="auth-modal-title" class="text-base sm:text-lg font-extrabold text-slate-900">로그인</h3>
             <p class="text-[11px] text-slate-400 mt-0.5">회원별 화장대·영양제·루틴 데이터가 계정에 안전하게 분리 저장됩니다.</p>
           </div>
-          <button onclick="closeAuthModal()" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold shrink-0">✕</button>
+          <button onclick="closeAuthModal()"
+            class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold shrink-0">✕</button>
         </div>
 
         <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-          <button id="auth-tab-login" onclick="switchAuthMode('LOGIN')" class="py-2 rounded-lg bg-white text-teal-700 shadow-2xs transition">로그인</button>
-          <button id="auth-tab-signup" onclick="switchAuthMode('SIGNUP')" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">회원가입</button>
-          <button id="auth-tab-find" onclick="switchAuthMode('FIND')" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">ID/PW 찾기</button>
+          <button id="auth-tab-login" onclick="switchAuthMode('LOGIN')"
+            class="py-2 rounded-lg bg-white text-teal-700 shadow-2xs transition">로그인</button>
+          <button id="auth-tab-signup" onclick="switchAuthMode('SIGNUP')"
+            class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">회원가입</button>
+          <button id="auth-tab-find" onclick="switchAuthMode('FIND')"
+            class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">ID/PW 찾기</button>
         </div>
 
         <div id="auth-alert-box" class="hidden p-3 rounded-xl text-xs font-bold break-words leading-relaxed"></div>
@@ -752,13 +1142,17 @@
         <div id="auth-view-login" class="space-y-3.5">
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
-            <input id="login-username" type="text" autocomplete="username" placeholder="아이디 입력" class="w-full min-h-[44px] px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+            <input id="login-username" type="text" autocomplete="username" placeholder="아이디 입력"
+              class="w-full min-h-[44px] px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
             <div class="relative">
-              <input id="login-password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitLogin()" placeholder="비밀번호 입력" class="w-full min-h-[44px] px-3.5 py-2.5 pr-14 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-              <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-bold text-slate-500 hover:text-slate-800">
+              <input id="login-password" type="password" autocomplete="current-password"
+                onkeydown="if(event.key==='Enter') submitLogin()" placeholder="비밀번호 입력"
+                class="w-full min-h-[44px] px-3.5 py-2.5 pr-14 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="togglePasswordVisibility('login-password', this)"
+                class="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-bold text-slate-500 hover:text-slate-800">
                 표시
               </button>
             </div>
@@ -769,12 +1163,14 @@
               <input id="login-remember-check" type="checkbox" checked class="w-4 h-4 accent-teal-600 rounded" />
               <span class="font-medium text-slate-700">로그인 상태 유지</span>
             </label>
-            <button type="button" onclick="switchAuthMode('FIND')" class="text-teal-600 font-bold hover:underline text-xs py-1">
+            <button type="button" onclick="switchAuthMode('FIND')"
+              class="text-teal-600 font-bold hover:underline text-xs py-1">
               아이디·비밀번호 찾기
             </button>
           </div>
 
-          <button id="btn-submit-login" onclick="submitLogin()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+          <button id="btn-submit-login" onclick="submitLogin()"
+            class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
             로그인 및 내 데이터 불러오기
           </button>
         </div>
@@ -784,8 +1180,11 @@
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
             <div class="flex flex-col sm:flex-row gap-2">
-              <input id="signup-username" type="text" autocomplete="username" oninput="onSignupUsernameInput()" placeholder="영문/숫자 3자 이상" class="flex-1 min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-              <button type="button" onclick="checkUsernameDuplicate()" class="min-h-[44px] px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold shrink-0 transition">
+              <input id="signup-username" type="text" autocomplete="username" oninput="onSignupUsernameInput()"
+                placeholder="영문/숫자 3자 이상"
+                class="flex-1 min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="checkUsernameDuplicate()"
+                class="min-h-[44px] px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold shrink-0 transition">
                 중복 확인
               </button>
             </div>
@@ -796,15 +1195,21 @@
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
               <div class="relative">
-                <input id="signup-password" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()" placeholder="4자 이상" class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-                <button type="button" onclick="togglePasswordVisibility('signup-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
+                <input id="signup-password" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()"
+                  placeholder="4자 이상"
+                  class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                <button type="button" onclick="togglePasswordVisibility('signup-password', this)"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
               </div>
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호 확인</label>
               <div class="relative">
-                <input id="signup-password-confirm" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()" placeholder="비밀번호 재입력" class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
-                <button type="button" onclick="togglePasswordVisibility('signup-password-confirm', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
+                <input id="signup-password-confirm" type="password" autocomplete="new-password"
+                  oninput="checkSignupPwMatch()" placeholder="비밀번호 재입력"
+                  class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+                <button type="button" onclick="togglePasswordVisibility('signup-password-confirm', this)"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
               </div>
             </div>
           </div>
@@ -813,23 +1218,31 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">닉네임</label>
-              <input id="signup-nickname" type="text" placeholder="표시될 닉네임 입력" class="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <input id="signup-nickname" type="text" placeholder="표시될 닉네임 입력"
+                class="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 (선택)</label>
               <div class="flex items-center gap-2.5">
-                <img id="signup-avatar-preview" src="" alt="미리보기" class="w-11 h-11 rounded-full object-cover border border-teal-300 hidden shrink-0" />
-                <div id="signup-avatar-placeholder" class="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-sm shrink-0">👤</div>
-                <label for="signup-profile-file" class="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer text-center transition">
+                <img id="signup-avatar-preview" src="" alt="미리보기"
+                  class="w-11 h-11 rounded-full object-cover border border-teal-300 hidden shrink-0" />
+                <div id="signup-avatar-placeholder"
+                  class="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-sm shrink-0">
+                  👤</div>
+                <label for="signup-profile-file"
+                  class="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer text-center transition">
                   사진 선택
                 </label>
-                <input id="signup-profile-file" type="file" accept="image/*" onchange="previewProfileImage(event, 'signup-avatar-preview', 'signup-avatar-placeholder')" class="hidden" />
+                <input id="signup-profile-file" type="file" accept="image/*"
+                  onchange="previewProfileImage(event, 'signup-avatar-preview', 'signup-avatar-placeholder')"
+                  class="hidden" />
               </div>
             </div>
           </div>
 
-          <button id="btn-submit-signup" onclick="submitSignup()" class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
+          <button id="btn-submit-signup" onclick="submitSignup()"
+            class="w-full min-h-[46px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm transition shadow-xs">
             회원가입 완료 및 시작하기
           </button>
         </div>
@@ -839,22 +1252,30 @@
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
             <div class="text-xs font-bold text-slate-800">아이디 찾기</div>
             <div class="flex flex-col sm:flex-row gap-2">
-              <input id="find-id-nickname" type="text" placeholder="가입한 닉네임 입력" class="flex-1 min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
-              <button onclick="submitFindId()" class="min-h-[42px] px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0">조회</button>
+              <input id="find-id-nickname" type="text" placeholder="가입한 닉네임 입력"
+                class="flex-1 min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <button onclick="submitFindId()"
+                class="min-h-[42px] px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0">조회</button>
             </div>
           </div>
 
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
             <div class="text-xs font-bold text-slate-800">비밀번호 재설정</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input id="reset-pw-username" type="text" placeholder="아이디 입력" class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
-              <input id="reset-pw-nickname" type="text" placeholder="닉네임 입력" class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="reset-pw-username" type="text" placeholder="아이디 입력"
+                class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="reset-pw-nickname" type="text" placeholder="닉네임 입력"
+                class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
             </div>
             <div class="relative">
-              <input id="reset-pw-new" type="password" placeholder="새 비밀번호 (4자 이상)" class="w-full min-h-[42px] px-3 py-2 pr-12 text-xs rounded-xl border border-slate-200 bg-white" />
-              <button type="button" onclick="togglePasswordVisibility('reset-pw-new', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500">표시</button>
+              <input id="reset-pw-new" type="password" placeholder="새 비밀번호 (4자 이상)"
+                class="w-full min-h-[42px] px-3 py-2 pr-12 text-xs rounded-xl border border-slate-200 bg-white" />
+              <button type="button" onclick="togglePasswordVisibility('reset-pw-new', this)"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500">표시</button>
             </div>
-            <button onclick="submitResetPassword()" class="w-full min-h-[42px] py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold">비밀번호 변경</button>
+            <button onclick="submitResetPassword()"
+              class="w-full min-h-[42px] py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold">비밀번호
+              변경</button>
           </div>
         </div>
       </div>
@@ -864,63 +1285,78 @@
   <!-- ===================================================================== -->
   <!-- [MODAL 2] 계정 관리 모달                                              -->
   <!-- ===================================================================== -->
-  <div id="account-modal-backdrop" onclick="if(event.target===this) closeAccountModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
+  <div id="account-modal-backdrop" onclick="if(event.target===this) closeAccountModal()"
+    class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-50 overflow-y-auto">
     <div class="min-h-full flex items-center justify-center p-3.5 sm:p-6">
-      <div class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div
+        class="bg-white rounded-2xl w-full max-w-md sm:max-w-lg my-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 class="text-base sm:text-lg font-extrabold text-slate-900">내 계정 관리</h3>
-          <button onclick="closeAccountModal()" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold">✕</button>
+          <button onclick="closeAccountModal()"
+            class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold">✕</button>
         </div>
 
         <div id="account-alert-box" class="hidden p-3 rounded-xl text-xs font-bold break-words leading-relaxed"></div>
 
         <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
           <div class="flex items-center gap-3.5">
-            <img id="acc-avatar-preview" src="" alt="프로필" class="w-12 h-12 rounded-full object-cover border border-teal-500 hidden shrink-0" />
-            <div id="acc-avatar-placeholder" class="w-12 h-12 rounded-full bg-teal-600 text-white font-black text-base flex items-center justify-center shrink-0">U</div>
+            <img id="acc-avatar-preview" src="" alt="프로필"
+              class="w-12 h-12 rounded-full object-cover border border-teal-500 hidden shrink-0" />
+            <div id="acc-avatar-placeholder"
+              class="w-12 h-12 rounded-full bg-teal-600 text-white font-black text-base flex items-center justify-center shrink-0">
+              U</div>
             <div class="min-w-0">
               <div class="text-xs sm:text-sm font-extrabold text-slate-900 truncate" id="acc-current-nickname">회원님</div>
               <div class="text-[11px] text-slate-500 truncate" id="acc-current-username">아이디: @user</div>
               <div class="text-[10px] text-slate-400" id="acc-created-at">가입일: -</div>
             </div>
           </div>
-          <div class="pt-2 border-t border-slate-200/80 flex flex-wrap gap-1.5 text-[11px]" id="acc-data-summary-badges"></div>
+          <div class="pt-2 border-t border-slate-200/80 flex flex-wrap gap-1.5 text-[11px]"
+            id="acc-data-summary-badges"></div>
         </div>
 
         <div class="space-y-3">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">닉네임 변경</label>
-              <input id="acc-nickname-input" type="text" class="w-full min-h-[42px] px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <input id="acc-nickname-input" type="text"
+                class="w-full min-h-[42px] px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 변경</label>
-              <label for="acc-profile-file" class="w-full min-h-[42px] px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold flex items-center justify-center cursor-pointer transition">
+              <label for="acc-profile-file"
+                class="w-full min-h-[42px] px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold flex items-center justify-center cursor-pointer transition">
                 📷 새 프로필 사진 선택
               </label>
-              <input id="acc-profile-file" type="file" accept="image/*" onchange="previewProfileImage(event, 'acc-avatar-preview', 'acc-avatar-placeholder')" class="hidden" />
+              <input id="acc-profile-file" type="file" accept="image/*"
+                onchange="previewProfileImage(event, 'acc-avatar-preview', 'acc-avatar-placeholder')" class="hidden" />
             </div>
           </div>
 
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
             <div class="text-xs font-bold text-slate-800">비밀번호 변경 (선택)</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input id="acc-current-pw" type="password" placeholder="현재 비밀번호" class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
-              <input id="acc-new-pw" type="password" placeholder="새 비밀번호 (4자 이상)" class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="acc-current-pw" type="password" placeholder="현재 비밀번호"
+                class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+              <input id="acc-new-pw" type="password" placeholder="새 비밀번호 (4자 이상)"
+                class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
             </div>
           </div>
 
-          <button onclick="submitProfileUpdate()" class="w-full min-h-[44px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm shadow-xs">
+          <button onclick="submitProfileUpdate()"
+            class="w-full min-h-[44px] py-3 rounded-xl btn-primary text-white font-bold text-xs sm:text-sm shadow-xs">
             변경사항 저장
           </button>
         </div>
 
         <div class="pt-3 border-t border-slate-200 space-y-2.5">
           <div class="flex items-center justify-between">
-            <button onclick="handleLogout(); closeAccountModal();" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+            <button onclick="handleLogout(); closeAccountModal();"
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
               로그아웃
             </button>
-            <button onclick="document.getElementById('delete-account-box').classList.toggle('hidden')" class="text-xs text-rose-500 hover:underline font-bold py-1">
+            <button onclick="document.getElementById('delete-account-box').classList.toggle('hidden')"
+              class="text-xs text-rose-500 hover:underline font-bold py-1">
               회원 탈퇴
             </button>
           </div>
@@ -928,8 +1364,11 @@
           <div id="delete-account-box" class="hidden p-3.5 rounded-xl bg-rose-50 border border-rose-200 space-y-2.5">
             <p class="text-[11px] text-rose-800 font-semibold">탈퇴 시 계정에 저장된 데이터가 모두 삭제됩니다.</p>
             <div class="flex gap-2">
-              <input id="delete-confirm-pw" type="password" placeholder="비밀번호 입력" class="flex-1 min-h-[40px] px-3 py-2 text-xs rounded-xl border border-rose-300 bg-white" />
-              <button onclick="submitDeleteAccount()" class="min-h-[40px] px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold shrink-0">탈퇴 확인</button>
+              <input id="delete-confirm-pw" type="password" placeholder="비밀번호 입력"
+                class="flex-1 min-h-[40px] px-3 py-2 text-xs rounded-xl border border-rose-300 bg-white" />
+              <button onclick="submitDeleteAccount()"
+                class="min-h-[40px] px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold shrink-0">탈퇴
+                확인</button>
             </div>
           </div>
         </div>
@@ -1015,12 +1454,21 @@
     let archiveCurrentPage = 1;
     const ARCHIVE_PAGE_SIZE = 10;
 
-    // -------------------- 모바일 웹 카메라 & OCR 자동 인식 상태 --------------------
+    // -------------------- 모바일 웹 카메라 & OCR 전성분 크롭 자동 인식 상태 --------------------
     let cameraMediaStream = null;
     let currentCameraFacingMode = "environment";
     let pendingOcrImageFile = null;
     let pendingOcrPreviewUrl = null;
     let lastOcrExtractedProduct = null;
+
+    let ocrCropSourceCanvas = null;
+    let ocrCropSourceUrl = null;
+    let ocrCropBox = { x: 0.06, y: 0.22, w: 0.88, h: 0.50 };
+    let ocrCropDragState = null;
+    let ocrCropOrigFilename = "camera_label.jpg";
+    let ocrCropSourceLabel = "📸 분석된 전성분 영역";
+    let ocrCropEventsBound = false;
+    let isOcrRequestInFlight = false;
 
     // -------------------- 초기 구동 --------------------
     window.addEventListener("DOMContentLoaded", async () => {
@@ -1527,7 +1975,7 @@
           },
           body: JSON.stringify(payload)
         });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function onRoutinePrefChange() {
@@ -1544,7 +1992,7 @@
             method: "POST",
             headers: { "Authorization": `Bearer ${authToken}` }
           });
-        } catch (e) {}
+        } catch (e) { }
       }
       const prevNick = currentUser ? currentUser.nickname : "";
       authToken = null;
@@ -2014,14 +2462,19 @@
     }
 
     // =========================================================================
-    // [모바일 카메라 촬영 + OCR 화장품 자동 인식 고도화 + 확인/수정/수동 등록]
+    // [모바일 카메라 가이드 크롭 + 손가락 드래그 영역 지정 + OCR 자동 인식]
     // =========================================================================
+    function clamp01(val, min = 0, max = 1) {
+      return Math.min(max, Math.max(min, val));
+    }
+
     async function startWebCamera(preferredFacingMode = null) {
       if (preferredFacingMode) {
         currentCameraFacingMode = preferredFacingMode;
       }
 
       hideCameraErrorBox();
+      closeOcrCropper(false);
       stopWebCamera();
 
       const liveContainer = document.getElementById("camera-live-container");
@@ -2029,12 +2482,15 @@
       const badgeEl = document.getElementById("ocr-status-badge");
       const streamLabel = document.getElementById("camera-stream-label");
       const facingBadge = document.getElementById("camera-facing-badge");
+      const zoomBar = document.getElementById("camera-zoom-bar");
+      const zoomSlider = document.getElementById("camera-zoom-slider");
+      const zoomLabel = document.getElementById("camera-zoom-label");
 
       const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
       if (!window.isSecureContext && !isLocalhost) {
         showCameraFallbackError(
           "HTTPS 보안 연결이 필요합니다",
-          "모바일 브라우저의 실시간 웹 카메라 미리보기는 HTTPS(보안 연결) 또는 localhost 환경에서만 허용됩니다. 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+          "모바일 브라우저의 실시간 웹 카메라 미리보기는 HTTPS(보안 연결) 또는 localhost 환경에서만 허용됩니다. 위/아래의 [📱 기본 카메라 촬영] 또는 [🖼️ 갤러리에서 사진 선택]을 이용하시면 전성분 영역을 바로 잘라 인식할 수 있습니다."
         );
         return;
       }
@@ -2042,19 +2498,20 @@
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showCameraFallbackError(
           "현재 브라우저에서 실시간 카메라 API를 지원하지 않습니다",
-          "인앱 브라우저나 구형 브라우저에서는 실시간 미리보기가 제한될 수 있습니다. 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+          "인앱 브라우저나 구형 브라우저에서는 실시간 미리보기가 제한될 수 있습니다. [📱 기본 카메라 촬영] 또는 [🖼️ 갤러리에서 사진 선택]을 이용해 주세요."
         );
         return;
       }
 
       badgeEl.textContent = "카메라 권한을 확인하고 미리보기를 준비 중입니다...";
 
+      const isPortrait = window.innerHeight > window.innerWidth;
       const primaryConstraints = {
         audio: false,
         video: {
           facingMode: { ideal: currentCameraFacingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: isPortrait ? 1080 : 1920 },
+          height: { ideal: isPortrait ? 1920 : 1080 }
         }
       };
 
@@ -2071,36 +2528,75 @@
         videoEl.srcObject = cameraMediaStream;
         await videoEl.play();
 
+        // 지원 기기에서 연속 자동초점 및 줌 슬라이더 활성화
+        if (zoomBar) zoomBar.classList.add("hidden");
+        try {
+          const videoTrack = cameraMediaStream.getVideoTracks()[0];
+          if (videoTrack && typeof videoTrack.getCapabilities === "function") {
+            const caps = videoTrack.getCapabilities();
+            if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+              videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
+            }
+            if (caps.zoom && typeof caps.zoom.min === "number" && typeof caps.zoom.max === "number" && caps.zoom.max > caps.zoom.min) {
+              const maxZ = Math.min(caps.zoom.max, 3.0);
+              const curZ = (videoTrack.getSettings && videoTrack.getSettings().zoom) || caps.zoom.min;
+              if (zoomSlider && zoomLabel && zoomBar) {
+                zoomSlider.min = String(caps.zoom.min);
+                zoomSlider.max = String(maxZ);
+                zoomSlider.step = String(caps.zoom.step || 0.1);
+                zoomSlider.value = String(curZ);
+                zoomLabel.textContent = `${Number(curZ).toFixed(1)}x`;
+                zoomBar.classList.remove("hidden");
+              }
+            }
+          }
+        } catch (capErr) {
+          // 일부 브라우저 미지원 무시
+        }
+
         const isRear = currentCameraFacingMode === "environment";
-        streamLabel.textContent = isRear ? "📷 후면 카메라 작동 중" : "🤳 전면 카메라 작동 중";
-        facingBadge.textContent = isRear ? "후면 카메라 모드" : "전면 카메라 모드";
+        streamLabel.textContent = isRear ? "📷 후면 카메라" : "🤳 전면 카메라";
+        facingBadge.textContent = isRear ? "후면 카메라 · 크롭" : "전면 카메라 · 크롭";
 
         liveContainer.classList.remove("hidden");
-        badgeEl.textContent = "라벨이 잘 보이도록 맞춘 후 [📸 사진 찍기]를 누르면 자동으로 성분을 인식합니다.";
+        liveContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        badgeEl.textContent = "밝은 네모 안에 전성분 글씨만 맞춘 뒤 [📸 네모 영역 촬영 · 인식]을 눌러주세요.";
       } catch (err) {
         stopWebCamera();
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           showCameraFallbackError(
             "카메라 접근 권한이 거부되었습니다",
-            "브라우저 주소창 왼쪽의 자물쇠(설정) 아이콘에서 '카메라' 권한을 [허용]으로 변경하거나, 아래 [기기 기본 카메라 앱으로 촬영] 또는 [갤러리에서 사진 선택]을 이용해 주세요."
+            "브라우저 주소창의 설정 아이콘에서 '카메라' 권한을 [허용]으로 변경하거나, [📱 기기 기본 카메라 앱으로 촬영] 또는 [🖼️ 갤러리에서 사진 선택]을 이용해 주세요."
           );
         } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
           showCameraFallbackError(
             "연결된 카메라 장치를 찾을 수 없습니다",
-            "현재 기기에 사용 가능한 카메라가 없거나 비활성화되어 있습니다. [갤러리에서 사진 선택]으로 라벨 이미지를 업로드해 주세요."
+            "현재 기기에 사용 가능한 카메라가 없거나 비활성화되어 있습니다. [🖼️ 갤러리에서 사진 선택]으로 라벨 이미지를 업로드해 주세요."
           );
         } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
           showCameraFallbackError(
             "카메라가 다른 앱에서 사용 중입니다",
-            "다른 앱에서 카메라를 사용 중이어서 접근할 수 없습니다. 다른 카메라 앱을 종료하거나 아래 갤러리 사진 업로드를 이용해 주세요."
+            "다른 앱에서 카메라를 사용 중이어서 접근할 수 없습니다. 다른 카메라 앱을 종료하거나 기본 카메라 촬영 / 갤러리 선택을 이용해 주세요."
           );
         } else {
           showCameraFallbackError(
             "카메라를 시작할 수 없습니다",
-            `카메라 연결 중 오류가 발생했습니다(${err.name || "알 수 없는 오류"}). 아래 기본 카메라 촬영 또는 갤러리 사진 선택을 이용해 주세요.`
+            `카메라 연결 중 오류가 발생했습니다(${err.name || "알 수 없는 오류"}). [📱 기본 카메라 촬영] 또는 [🖼️ 갤러리 사진 선택]을 이용해 주세요.`
           );
         }
       }
+    }
+
+    function applyCameraZoom(zoomVal) {
+      const z = parseFloat(zoomVal);
+      const zoomLabel = document.getElementById("camera-zoom-label");
+      if (zoomLabel && !Number.isNaN(z)) {
+        zoomLabel.textContent = `${z.toFixed(1)}x`;
+      }
+      if (!cameraMediaStream) return;
+      const track = cameraMediaStream.getVideoTracks()[0];
+      if (!track || typeof track.applyConstraints !== "function") return;
+      track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => { });
     }
 
     function switchCameraFacingMode() {
@@ -2117,6 +2613,10 @@
       if (videoEl) {
         videoEl.srcObject = null;
       }
+      const zoomBar = document.getElementById("camera-zoom-bar");
+      if (zoomBar) {
+        zoomBar.classList.add("hidden");
+      }
       const liveContainer = document.getElementById("camera-live-container");
       if (liveContainer) {
         liveContainer.classList.add("hidden");
@@ -2128,7 +2628,7 @@
       document.getElementById("camera-error-title").textContent = `⚠️ ${title}`;
       document.getElementById("camera-error-msg").textContent = message;
       box.classList.remove("hidden");
-      document.getElementById("ocr-status-badge").textContent = "카메라 대신 갤러리 업로드 또는 수동 등록을 진행할 수 있습니다.";
+      document.getElementById("ocr-status-badge").textContent = "기본 카메라 촬영·갤러리 업로드(영역 크롭) 또는 수동 등록을 진행할 수 있습니다.";
     }
 
     function hideCameraErrorBox() {
@@ -2137,34 +2637,383 @@
 
     function capturePhotoFromVideo() {
       const videoEl = document.getElementById("camera-video-el");
-      const canvas = document.getElementById("camera-capture-canvas");
-
+      const guideEl = document.getElementById("camera-guide-box");
       if (!videoEl || !cameraMediaStream) return;
 
-      const width = videoEl.videoWidth || 1280;
-      const height = videoEl.videoHeight || 720;
-      canvas.width = width;
-      canvas.height = height;
+      const vw = videoEl.videoWidth || 1280;
+      const vh = videoEl.videoHeight || 720;
+      const vRect = videoEl.getBoundingClientRect();
+      const cw = vRect.width || vw;
+      const ch = vRect.height || vh;
 
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(videoEl, 0, 0, width, height);
+      // object-cover로 실제 화면에 표시되는 원본 비디오 영역(visX, visY, visW, visH) 정확히 계산
+      const scale = Math.max(cw / vw, ch / vh);
+      const drawnW = vw * scale;
+      const drawnH = vh * scale;
+      const offsetX = (cw - drawnW) / 2;
+      const offsetY = (ch - drawnH) / 2;
 
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const fileName = `camera_label_${Date.now()}.jpg`;
-        const capturedFile = new File([blob], fileName, { type: "image/jpeg" });
-        stopWebCamera();
-        setOcrPhotoPreviewAndExtract(capturedFile, "📸 직접 촬영한 라벨 사진");
-      }, "image/jpeg", 0.92);
+      const visX = clamp01(-offsetX / scale, 0, vw);
+      const visY = clamp01(-offsetY / scale, 0, vh);
+      const visW = Math.max(1, Math.min(vw - visX, cw / scale));
+      const visH = Math.max(1, Math.min(vh - visY, ch / scale));
+
+      // 재크롭용 원본(화면 표시 영역) 캔버스 생성 (모바일 메모리 안전 최대 2200px)
+      const MAX_SOURCE_DIM = 2200;
+      const srcScale = Math.min(1, MAX_SOURCE_DIM / Math.max(visW, visH));
+      const srcCanvas = document.createElement("canvas");
+      srcCanvas.width = Math.max(1, Math.round(visW * srcScale));
+      srcCanvas.height = Math.max(1, Math.round(visH * srcScale));
+      const srcCtx = srcCanvas.getContext("2d");
+      srcCtx.drawImage(videoEl, visX, visY, visW, visH, 0, 0, srcCanvas.width, srcCanvas.height);
+
+      // 밝은 가이드 박스(#camera-guide-box)의 상대 좌표 계산 -> 실제 네모 안쪽만 크롭
+      let guideCrop = { x: 0.06, y: 0.19, w: 0.88, h: 0.62 };
+      if (guideEl && cw > 0 && ch > 0) {
+        const gRect = guideEl.getBoundingClientRect();
+        if (gRect.width > 10 && gRect.height > 10) {
+          const gx = clamp01((gRect.left - vRect.left) / cw, 0, 0.9);
+          const gy = clamp01((gRect.top - vRect.top) / ch, 0, 0.9);
+          const gw = clamp01(gRect.width / cw, 0.1, 1 - gx);
+          const gh = clamp01(gRect.height / ch, 0.08, 1 - gy);
+          guideCrop = { x: gx, y: gy, w: gw, h: gh };
+        }
+      }
+
+      ocrCropSourceCanvas = srcCanvas;
+      ocrCropBox = guideCrop;
+      ocrCropOrigFilename = `camera_label_${Date.now()}.jpg`;
+      ocrCropSourceLabel = "📸 촬영 · 크롭된 전성분 영역";
+
+      stopWebCamera();
+
+      // 재크롭 시 바로 열 수 있도록 원본 프리뷰 URL을 백그라운드 갱신하고, 가이드 영역만 즉시 OCR 실행
+      updateCropperSourceImageFromCanvas();
+      confirmOcrCropAndExtract();
     }
 
-    function handleOcrFileSelect(event) {
+    function handleOcrFileSelect(event, sourceKind = "gallery") {
       const file = event.target.files[0];
       if (!file) return;
       stopWebCamera();
       hideCameraErrorBox();
-      setOcrPhotoPreviewAndExtract(file, "🖼️ 선택한 사진 미리보기");
       event.target.value = "";
+
+      const sourceTitle = sourceKind === "native"
+        ? "📱 기본 카메라 촬영 (전성분 영역 지정)"
+        : "🖼️ 갤러리 사진 (전성분 영역 지정)";
+
+      loadFileIntoOcrCropper(file, sourceTitle);
+    }
+
+    function loadFileIntoOcrCropper(file, sourceTitle) {
+      const badge = document.getElementById("ocr-status-badge");
+      if (badge) badge.textContent = "사진을 불러오는 중입니다...";
+
+      const tempUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const natW = img.naturalWidth || img.width;
+          const natH = img.naturalHeight || img.height;
+          if (!natW || !natH) {
+            throw new Error("invalid image dimensions");
+          }
+
+          // 모바일 고화소(12MP~200MP) 사진의 Safari Canvas 메모리 한계 방지용 최대 2200px 스케일
+          const MAX_SOURCE_DIM = 2200;
+          const scale = Math.min(1, MAX_SOURCE_DIM / Math.max(natW, natH));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(natW * scale));
+          canvas.height = Math.max(1, Math.round(natH * scale));
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          ocrCropSourceCanvas = canvas;
+          const baseName = (file.name || "label").replace(/\.[^.]+$/, "");
+          ocrCropOrigFilename = `${baseName}.jpg`;
+          ocrCropSourceLabel = sourceTitle || "✂️ 크롭된 전성분 영역";
+          ocrCropBox = { x: 0.06, y: 0.22, w: 0.88, h: 0.50 };
+
+          updateCropperSourceImageFromCanvas(() => {
+            openOcrCropperUI(sourceTitle);
+          });
+        } catch (err) {
+          // 캔버스 디코딩 예외 시 원본 파일로 폴백
+          setOcrPhotoPreviewAndExtract(file, "🖼️ 선택한 사진 미리보기");
+        } finally {
+          URL.revokeObjectURL(tempUrl);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(tempUrl);
+        setOcrPhotoPreviewAndExtract(file, "🖼️ 선택한 사진 미리보기");
+      };
+      img.src = tempUrl;
+    }
+
+    function updateCropperSourceImageFromCanvas(onReady) {
+      if (!ocrCropSourceCanvas) {
+        if (typeof onReady === "function") onReady();
+        return;
+      }
+      ocrCropSourceCanvas.toBlob((blob) => {
+        if (!blob) {
+          if (typeof onReady === "function") onReady();
+          return;
+        }
+        if (ocrCropSourceUrl) {
+          URL.revokeObjectURL(ocrCropSourceUrl);
+        }
+        ocrCropSourceUrl = URL.createObjectURL(blob);
+        const srcImg = document.getElementById("ocr-crop-source-img");
+        if (srcImg) {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            renderOcrCropBox();
+            if (typeof onReady === "function") onReady();
+          };
+          srcImg.onload = finish;
+          srcImg.onerror = finish;
+          srcImg.src = ocrCropSourceUrl;
+        } else if (typeof onReady === "function") {
+          onReady();
+        }
+      }, "image/jpeg", 0.90);
+    }
+
+    function openOcrCropperUI(titleText) {
+      initOcrCropperEvents();
+      const previewBox = document.getElementById("ocr-photo-preview-box");
+      if (previewBox) previewBox.classList.add("hidden");
+
+      const titleEl = document.getElementById("ocr-cropper-title");
+      if (titleEl && titleText) {
+        titleEl.textContent = `✂️ ${titleText.replace(/^[📸📱🖼️✂️]\s*/, "")}`;
+      }
+
+      const cropperBox = document.getElementById("ocr-cropper-box");
+      if (cropperBox) {
+        cropperBox.classList.remove("hidden");
+        renderOcrCropBox();
+        setTimeout(() => {
+          renderOcrCropBox();
+          cropperBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 60);
+      }
+
+      const badge = document.getElementById("ocr-status-badge");
+      if (badge) {
+        badge.textContent = "모서리·변을 손가락으로 움직여 [전성분] 부분만 맞춘 뒤 [🔍 선택한 전성분 영역 인식하기]를 눌러주세요.";
+      }
+    }
+
+    function reopenOcrCropper() {
+      if (!ocrCropSourceCanvas) {
+        alert("다시 자를 원본 사진이 없습니다. 사진을 새로 촬영하거나 선택해 주세요.");
+        return;
+      }
+      stopWebCamera();
+      openOcrCropperUI("전성분 영역 다시 자르기");
+    }
+
+    function closeOcrCropper(restorePreviewIfAny = true) {
+      const cropperBox = document.getElementById("ocr-cropper-box");
+      if (cropperBox) cropperBox.classList.add("hidden");
+      if (restorePreviewIfAny && pendingOcrPreviewUrl) {
+        const previewBox = document.getElementById("ocr-photo-preview-box");
+        if (previewBox) previewBox.classList.remove("hidden");
+      }
+    }
+
+    function setOcrCropPreset(mode) {
+      if (mode === "full") {
+        ocrCropBox = { x: 0.0, y: 0.0, w: 1.0, h: 1.0 };
+      } else {
+        ocrCropBox = { x: 0.06, y: 0.22, w: 0.88, h: 0.50 };
+      }
+      renderOcrCropBox();
+    }
+
+    function rotateOcrCropImage(deg = 90) {
+      if (!ocrCropSourceCanvas) return;
+      const oldC = ocrCropSourceCanvas;
+      const rotC = document.createElement("canvas");
+      const rad = (deg * Math.PI) / 180;
+      const swap = Math.abs(deg) % 180 === 90;
+      rotC.width = swap ? oldC.height : oldC.width;
+      rotC.height = swap ? oldC.width : oldC.height;
+
+      const ctx = rotC.getContext("2d");
+      ctx.translate(rotC.width / 2, rotC.height / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(oldC, -oldC.width / 2, -oldC.height / 2);
+
+      ocrCropSourceCanvas = rotC;
+      ocrCropBox = { x: 0.06, y: 0.22, w: 0.88, h: 0.50 };
+      updateCropperSourceImageFromCanvas(() => {
+        renderOcrCropBox();
+      });
+    }
+
+    function renderOcrCropBox() {
+      const rectEl = document.getElementById("ocr-crop-rect");
+      const maskEl = document.getElementById("ocr-crop-mask");
+      if (!rectEl) return;
+
+      const leftPct = `${(ocrCropBox.x * 100).toFixed(3)}%`;
+      const topPct = `${(ocrCropBox.y * 100).toFixed(3)}%`;
+      const widthPct = `${(ocrCropBox.w * 100).toFixed(3)}%`;
+      const heightPct = `${(ocrCropBox.h * 100).toFixed(3)}%`;
+
+      rectEl.style.left = leftPct;
+      rectEl.style.top = topPct;
+      rectEl.style.width = widthPct;
+      rectEl.style.height = heightPct;
+
+      if (maskEl) {
+        maskEl.style.left = leftPct;
+        maskEl.style.top = topPct;
+        maskEl.style.width = widthPct;
+        maskEl.style.height = heightPct;
+      }
+    }
+
+    function initOcrCropperEvents() {
+      if (ocrCropEventsBound) return;
+      const stageEl = document.getElementById("ocr-crop-stage");
+      const rectEl = document.getElementById("ocr-crop-rect");
+      if (!stageEl || !rectEl) return;
+
+      const MIN_W = 0.12;
+      const MIN_H = 0.08;
+
+      const onPointerDown = (e) => {
+        const targetActionEl = e.target.closest("[data-action]");
+        if (!targetActionEl) return;
+        const action = targetActionEl.dataset.action;
+        if (!action) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const stageRect = stageEl.getBoundingClientRect();
+        if (stageRect.width < 10 || stageRect.height < 10) return;
+
+        ocrCropDragState = {
+          pointerId: e.pointerId,
+          action,
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          startBox: { ...ocrCropBox },
+          stageRect
+        };
+
+        try {
+          stageEl.setPointerCapture(e.pointerId);
+        } catch (err) {
+          // 일부 브라우저 무시
+        }
+      };
+
+      const onPointerMove = (e) => {
+        if (!ocrCropDragState || e.pointerId !== ocrCropDragState.pointerId) return;
+        e.preventDefault();
+
+        const { action, startClientX, startClientY, startBox, stageRect } = ocrCropDragState;
+        const dx = (e.clientX - startClientX) / Math.max(1, stageRect.width);
+        const dy = (e.clientY - startClientY) / Math.max(1, stageRect.height);
+
+        let { x, y, w, h } = startBox;
+
+        if (action === "move") {
+          x = clamp01(startBox.x + dx, 0, 1 - startBox.w);
+          y = clamp01(startBox.y + dy, 0, 1 - startBox.h);
+        } else {
+          if (action.includes("w")) {
+            const rightEdge = startBox.x + startBox.w;
+            const newLeft = clamp01(startBox.x + dx, 0, rightEdge - MIN_W);
+            x = newLeft;
+            w = rightEdge - newLeft;
+          }
+          if (action.includes("e")) {
+            w = clamp01(startBox.w + dx, MIN_W, 1 - startBox.x);
+          }
+          if (action.includes("n")) {
+            const bottomEdge = startBox.y + startBox.h;
+            const newTop = clamp01(startBox.y + dy, 0, bottomEdge - MIN_H);
+            y = newTop;
+            h = bottomEdge - newTop;
+          }
+          if (action.includes("s")) {
+            h = clamp01(startBox.h + dy, MIN_H, 1 - startBox.y);
+          }
+        }
+
+        ocrCropBox = { x, y, w, h };
+        renderOcrCropBox();
+      };
+
+      const onPointerEnd = (e) => {
+        if (!ocrCropDragState || e.pointerId !== ocrCropDragState.pointerId) return;
+        try {
+          stageEl.releasePointerCapture(e.pointerId);
+        } catch (err) {
+          // 무시
+        }
+        ocrCropDragState = null;
+      };
+
+      stageEl.addEventListener("pointerdown", onPointerDown, { passive: false });
+      stageEl.addEventListener("pointermove", onPointerMove, { passive: false });
+      stageEl.addEventListener("pointerup", onPointerEnd);
+      stageEl.addEventListener("pointercancel", onPointerEnd);
+
+      // 모바일 브라우저에서 크롭 드래그 중 페이지 스크롤 간섭 차단
+      stageEl.addEventListener("touchmove", (e) => {
+        if (ocrCropDragState) e.preventDefault();
+      }, { passive: false });
+
+      ocrCropEventsBound = true;
+    }
+
+    function confirmOcrCropAndExtract() {
+      if (!ocrCropSourceCanvas || isOcrRequestInFlight) return;
+
+      const sw = ocrCropSourceCanvas.width;
+      const sh = ocrCropSourceCanvas.height;
+
+      const sx = Math.max(0, Math.min(sw - 1, Math.round(ocrCropBox.x * sw)));
+      const sy = Math.max(0, Math.min(sh - 1, Math.round(ocrCropBox.y * sh)));
+      const cw = Math.max(16, Math.min(sw - sx, Math.round(ocrCropBox.w * sw)));
+      const ch = Math.max(16, Math.min(sh - sy, Math.round(ocrCropBox.h * sh)));
+
+      // 크롭한 전성분 조각을 OCR 최적 크기(최대 1200px)로 리사이즈하여 전송 -> 글씨 선명도 극대화 + 502 방지
+      const MAX_UPLOAD_DIM = 1200;
+      const outScale = Math.min(1, MAX_UPLOAD_DIM / Math.max(cw, ch));
+      const outCanvas = document.getElementById("camera-capture-canvas") || document.createElement("canvas");
+      outCanvas.width = Math.max(1, Math.round(cw * outScale));
+      outCanvas.height = Math.max(1, Math.round(ch * outScale));
+
+      const outCtx = outCanvas.getContext("2d");
+      outCtx.imageSmoothingEnabled = true;
+      outCtx.imageSmoothingQuality = "high";
+      outCtx.drawImage(ocrCropSourceCanvas, sx, sy, cw, ch, 0, 0, outCanvas.width, outCanvas.height);
+
+      closeOcrCropper(false);
+
+      outCanvas.toBlob((blob) => {
+        if (!blob) {
+          alert("이미지 영역을 자르는 중 오류가 발생했습니다. 다시 시도해 주세요.");
+          return;
+        }
+        const croppedFile = new File([blob], ocrCropOrigFilename || `camera_label_${Date.now()}.jpg`, {
+          type: "image/jpeg"
+        });
+        setOcrPhotoPreviewAndExtract(croppedFile, ocrCropSourceLabel || "✂️ 선택한 전성분 영역");
+      }, "image/jpeg", 0.92);
     }
 
     async function setOcrPhotoPreviewAndExtract(fileObj, sourceTitle) {
@@ -2174,7 +3023,7 @@
       pendingOcrImageFile = fileObj;
       pendingOcrPreviewUrl = URL.createObjectURL(fileObj);
 
-      document.getElementById("ocr-preview-source-badge").textContent = sourceTitle || "📸 사진 미리보기";
+      document.getElementById("ocr-preview-source-badge").textContent = sourceTitle || "📸 분석된 전성분 영역";
       document.getElementById("ocr-preview-filename").textContent = fileObj.name;
       document.getElementById("ocr-photo-preview-img").src = pendingOcrPreviewUrl;
       document.getElementById("ocr-photo-preview-box").classList.remove("hidden");
@@ -2192,13 +3041,25 @@
         URL.revokeObjectURL(pendingOcrPreviewUrl);
         pendingOcrPreviewUrl = null;
       }
+      if (ocrCropSourceUrl) {
+        URL.revokeObjectURL(ocrCropSourceUrl);
+        ocrCropSourceUrl = null;
+      }
+      ocrCropSourceCanvas = null;
       pendingOcrImageFile = null;
+
+      const cropperBox = document.getElementById("ocr-cropper-box");
+      if (cropperBox) cropperBox.classList.add("hidden");
+      const cropImg = document.getElementById("ocr-crop-source-img");
+      if (cropImg) cropImg.src = "";
+
       const previewBox = document.getElementById("ocr-photo-preview-box");
       if (previewBox) previewBox.classList.add("hidden");
       const previewImg = document.getElementById("ocr-photo-preview-img");
       if (previewImg) previewImg.src = "";
+
       const badge = document.getElementById("ocr-status-badge");
-      if (badge) badge.textContent = "사진을 촬영/선택하면 브랜드·제품명·전성분·제형이 자동 추출됩니다.";
+      if (badge) badge.textContent = "사진을 촬영/선택하고 전성분 영역을 지정하면 성분이 자동 추출됩니다.";
     }
 
     function resetOcrFormFields() {
@@ -2230,6 +3091,9 @@
     }
 
     async function runOcrAutoExtraction(file) {
+      if (isOcrRequestInFlight) return;
+      isOcrRequestInFlight = true;
+
       const brandInput = document.getElementById("ocr-brand-input");
       const nameInput = document.getElementById("ocr-name-input");
       const typeSelect = document.getElementById("ocr-type-select");
@@ -2238,10 +3102,12 @@
       const modeBadge = document.getElementById("ocr-recognition-mode-badge");
       const matchBanner = document.getElementById("ocr-match-banner");
       const badge = document.getElementById("ocr-status-badge");
+      const cropBtn = document.getElementById("btn-run-cropped-ocr");
 
-      badge.textContent = `⏳ '${file.name}'에서 브랜드·제품명·제형·전성분을 자동 인식 중입니다...`;
+      if (cropBtn) cropBtn.disabled = true;
+      badge.textContent = "⏳ 선택한 전성분 영역에서 성분을 정밀 인식·교정 중입니다...";
       modeBadge.className = "px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold";
-      modeBadge.textContent = "⏳ OCR 자동 추출 중...";
+      modeBadge.textContent = "⏳ OCR 전성분 추출 중...";
 
       const formData = new FormData();
       formData.append("file", file);
@@ -2255,19 +3121,40 @@
           method: "POST",
           body: formData
         });
-        const data = await res.json();
 
-        if (!res.ok || data.ocr_recognized === false || data.fallback_manual) {
+        const rawBody = await res.text();
+        let data = {};
+        try {
+          data = rawBody ? JSON.parse(rawBody) : {};
+        } catch (parseErr) {
+          data = {};
+        }
+
+        if (!res.ok) {
+          matchedIdInput.value = "0";
+          modeBadge.className = "px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold";
+          modeBadge.textContent = `⚠️ 서버 응답 오류 (${res.status})`;
+
+          matchBanner.classList.remove("hidden");
+          matchBanner.className = "p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs leading-relaxed";
+          const serverHint = (res.status === 502 || res.status === 503 || res.status === 504)
+            ? "서버 처리 시간이 초과되었거나 이미지가 큽니다. 위의 <b>[✂️ 영역 다시 자르기]</b>로 전성분 글씨만 더 좁게 맞춰 다시 시도해 주세요."
+            : (data.message || "OCR 분석 중 서버 오류가 발생했습니다. 영역을 다시 자르거나 수동으로 입력해 주세요.");
+          matchBanner.innerHTML = `<b>⚠️ OCR 처리 지연/오류:</b> ${serverHint}`;
+          badge.textContent = "영역을 더 좁게 자르거나 잠시 후 다시 시도해 주세요.";
+          return;
+        }
+
+        if (data.ocr_recognized === false || data.fallback_manual) {
           matchedIdInput.value = "0";
           modeBadge.className = "px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold";
-          modeBadge.textContent = "⚠️ 자동 인식 실패 · 수동 등록 모드";
+          modeBadge.textContent = "⚠️ 전성분 인식 부족 · 재시도/수동 입력";
 
           matchBanner.classList.remove("hidden");
           matchBanner.className = "p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed";
-          matchBanner.innerHTML = `<b>⚠️ 자동 인식 안내:</b> ${data.message || "라벨 글씨를 인식하지 못했습니다."} 아래 입력칸에 브랜드·제품명·전성분을 직접 입력해 수동으로 등록하실 수 있습니다.`;
+          matchBanner.innerHTML = `<b>⚠️ 전성분 인식 안내:</b> ${data.message || "선택한 영역에서 글씨를 충분히 읽지 못했습니다."} 위의 <b>[✂️ 영역 다시 자르기]</b>로 전성분 부분만 더 좁고 똑바로 맞춰 재시도하거나, 아래에 직접 입력해 주세요.`;
 
-          badge.textContent = "인식 실패: 아래 입력란에 수동으로 정보를 입력한 뒤 등록 버튼을 눌러주세요.";
-          nameInput.focus();
+          badge.textContent = "전성분이 잘 보이도록 [✂️ 영역 다시 자르기]를 시도하거나 수동으로 입력해 주세요.";
           return;
         }
 
@@ -2303,19 +3190,25 @@
           matchBanner.innerHTML = `<b>✓ 기존 DB 매칭 완료:</b> DB에 등록된 <b>[${prod.brand}] ${prod.name}</b> 제품과 일치하여 전성분 및 제형 정보를 자동으로 불러왔습니다. 확인 후 아래 등록 버튼을 눌러주세요.`;
         } else {
           modeBadge.className = "px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold";
-          modeBadge.textContent = "✨ 신규 제품 OCR 추출 완료";
+          modeBadge.textContent = `✨ 전성분 ${(data.raw_ingredients || []).length}종 추출 완료`;
 
           matchBanner.classList.remove("hidden");
           matchBanner.className = "p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-xs leading-relaxed";
-          matchBanner.innerHTML = `<b>✨ OCR 자동 추출 완료:</b> 추출된 브랜드·제품명·제형·전성분을 확인하고 필요 시 수정한 뒤 아래 <b>[확인 완료 · 분석 목록 및 DB 등록]</b>을 눌러주세요.`;
+          matchBanner.innerHTML = `<b>✨ 전성분 OCR 추출 완료:</b> 추출된 전성분을 확인하고 브랜드·제품명을 입력(또는 수정)한 뒤 아래 <b>[확인 완료 · 분석 목록 및 DB 등록]</b>을 눌러주세요.`;
         }
 
         badge.textContent = "추출 결과를 확인·수정한 뒤 [확인 완료 · 분석 목록 및 DB 등록] 버튼을 눌러주세요.";
       } catch (err) {
         matchedIdInput.value = "0";
         modeBadge.className = "px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold";
-        modeBadge.textContent = "수동 입력 모드";
+        modeBadge.textContent = "네트워크 오류 · 수동 입력 가능";
+        matchBanner.classList.remove("hidden");
+        matchBanner.className = "p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed";
+        matchBanner.innerHTML = `<b>⚠️ 네트워크 연결 확인:</b> 서버와 통신에 실패했습니다. 네트워크 상태를 확인 후 <b>[✂️ 영역 다시 자르기]</b>로 재시도하거나 수동으로 입력해 주세요.`;
         badge.textContent = "서버 연결을 확인하거나 수동으로 정보를 입력해 등록해 주세요.";
+      } finally {
+        isOcrRequestInFlight = false;
+        if (cropBtn) cropBtn.disabled = false;
       }
     }
 
@@ -2947,7 +3840,7 @@
           renderVanityConflictPanel(data);
           renderHomeDashboard();
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function renderVanityConflictPanel(data) {
@@ -3016,7 +3909,7 @@
                 <div class="text-[11px] text-slate-400 line-clamp-1 mt-0.5">${item.sample_ingredients || "건강기능식품"}</div>
               </div>`).join("");
         dropdown.classList.remove("hidden");
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function addSupplementFromDb(item) {
@@ -3361,8 +4254,8 @@
             <span class="text-[11px] text-slate-400">중복 추천 자동 제외됨</span>
           </div>
           ${userSuppList.length === 0
-            ? `<div class="text-xs text-slate-400 py-1">현재 등록된 복용 영양제가 없습니다. 좌측에서 검색해 추가할 수 있습니다.</div>`
-            : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          ? `<div class="text-xs text-slate-400 py-1">현재 등록된 복용 영양제가 없습니다. 좌측에서 검색해 추가할 수 있습니다.</div>`
+          : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 ${userSuppList.map(u => `
                   <div class="p-3 rounded-xl bg-teal-50/40 border border-teal-200 text-xs space-y-1.5">
                     <div class="flex flex-wrap items-center justify-between gap-1">
@@ -3373,7 +4266,7 @@
                     <div class="text-xs text-slate-600 leading-relaxed"><b>복용법:</b> ${u.how_to_take}</div>
                   </div>`).join("")}
               </div>`
-          }
+        }
         </div>`;
 
       const aiSuppCardsHtml = aiSuppList.map((s, sIdx) => {
@@ -3673,4 +4566,5 @@
     }
   </script>
 </body>
+
 </html>
