@@ -1181,14 +1181,14 @@
             <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
             <div class="flex flex-col sm:flex-row gap-2">
               <input id="signup-username" type="text" autocomplete="username" oninput="onSignupUsernameInput()"
-                placeholder="영문/숫자 3자 이상"
+                placeholder="영문/숫자/밑줄(_) 3~20자"
                 class="flex-1 min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
               <button type="button" onclick="checkUsernameDuplicate()"
                 class="min-h-[44px] px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold shrink-0 transition">
                 중복 확인
               </button>
             </div>
-            <p id="signup-id-check-msg" class="text-[11px] text-slate-400 mt-1">아이디 입력 후 [중복 확인]을 진행해 주세요.</p>
+            <p id="signup-id-check-msg" class="text-[11px] text-slate-400 mt-1">영문·숫자·밑줄(_) 3~20자 입력 후 [중복 확인]을 진행해 주세요.</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1196,7 +1196,7 @@
               <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
               <div class="relative">
                 <input id="signup-password" type="password" autocomplete="new-password" oninput="checkSignupPwMatch()"
-                  placeholder="4자 이상"
+                  placeholder="영문+숫자 8자 이상"
                   class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
                 <button type="button" onclick="togglePasswordVisibility('signup-password', this)"
                   class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
@@ -1215,15 +1215,26 @@
           </div>
           <p id="signup-pw-match-msg" class="text-[11px] text-slate-400 -mt-1"></p>
 
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">계정 복구 보안코드 <span class="text-[11px] font-normal text-slate-400">(비밀번호 분실 시 본인확인용 · 암호화 보관)</span></label>
+            <div class="relative">
+              <input id="signup-recovery-pin" type="password" autocomplete="off"
+                placeholder="본인만 아는 복구 코드 (4~20자)"
+                class="w-full min-h-[44px] px-3.5 py-2 pr-12 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onclick="togglePasswordVisibility('signup-recovery-pin', this)"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[11px] font-bold text-slate-500">표시</button>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">닉네임</label>
-              <input id="signup-nickname" type="text" placeholder="표시될 닉네임 입력"
+              <input id="signup-nickname" type="text" maxlength="30" placeholder="표시될 닉네임 입력"
                 class="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500" />
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 (선택)</label>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">프로필 사진 (선택 · JPG/PNG/WEBP, 2MB)</label>
               <div class="flex items-center gap-2.5">
                 <img id="signup-avatar-preview" src="" alt="미리보기"
                   class="w-11 h-11 rounded-full object-cover border border-teal-300 hidden shrink-0" />
@@ -1234,7 +1245,7 @@
                   class="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer text-center transition">
                   사진 선택
                 </label>
-                <input id="signup-profile-file" type="file" accept="image/*"
+                <input id="signup-profile-file" type="file" accept="image/jpeg,image/png,image/webp"
                   onchange="previewProfileImage(event, 'signup-avatar-preview', 'signup-avatar-placeholder')"
                   class="hidden" />
               </div>
@@ -1250,7 +1261,7 @@
         <!-- 아이디/비밀번호 찾기 뷰 -->
         <div id="auth-view-find" class="hidden space-y-3.5">
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-            <div class="text-xs font-bold text-slate-800">아이디 찾기</div>
+            <div class="text-xs font-bold text-slate-800">아이디 찾기 <span class="text-[11px] font-normal text-slate-400">(보안을 위해 일부 마스킹 표시)</span></div>
             <div class="flex flex-col sm:flex-row gap-2">
               <input id="find-id-nickname" type="text" placeholder="가입한 닉네임 입력"
                 class="flex-1 min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
@@ -1260,7 +1271,7 @@
           </div>
 
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-            <div class="text-xs font-bold text-slate-800">비밀번호 재설정</div>
+            <div class="text-xs font-bold text-slate-800">비밀번호 재설정 <span class="text-[11px] font-normal text-slate-400">(복구 보안코드 검증 필수)</span></div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input id="reset-pw-username" type="text" placeholder="아이디 입력"
                 class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
@@ -1268,7 +1279,13 @@
                 class="w-full min-h-[42px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
             </div>
             <div class="relative">
-              <input id="reset-pw-new" type="password" placeholder="새 비밀번호 (4자 이상)"
+              <input id="reset-pw-recovery-pin" type="password" autocomplete="off" placeholder="가입 시 설정한 복구 보안코드 입력"
+                class="w-full min-h-[42px] px-3 py-2 pr-12 text-xs rounded-xl border border-slate-200 bg-white" />
+              <button type="button" onclick="togglePasswordVisibility('reset-pw-recovery-pin', this)"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500">표시</button>
+            </div>
+            <div class="relative">
+              <input id="reset-pw-new" type="password" placeholder="새 비밀번호 (영문+숫자 8자 이상)"
                 class="w-full min-h-[42px] px-3 py-2 pr-12 text-xs rounded-xl border border-slate-200 bg-white" />
               <button type="button" onclick="togglePasswordVisibility('reset-pw-new', this)"
                 class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500">표시</button>
@@ -1328,19 +1345,23 @@
                 class="w-full min-h-[42px] px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold flex items-center justify-center cursor-pointer transition">
                 📷 새 프로필 사진 선택
               </label>
-              <input id="acc-profile-file" type="file" accept="image/*"
+              <input id="acc-profile-file" type="file" accept="image/jpeg,image/png,image/webp"
                 onchange="previewProfileImage(event, 'acc-avatar-preview', 'acc-avatar-placeholder')" class="hidden" />
             </div>
           </div>
 
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-            <div class="text-xs font-bold text-slate-800">비밀번호 변경 (선택)</div>
+            <div class="text-xs font-bold text-slate-800">보안 설정 변경 (비밀번호 · 복구 보안코드)</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input id="acc-current-pw" type="password" placeholder="현재 비밀번호"
+              <input id="acc-current-pw" type="password" placeholder="현재 비밀번호 (변경 시 필수)"
                 class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
-              <input id="acc-new-pw" type="password" placeholder="새 비밀번호 (4자 이상)"
+              <input id="acc-new-pw" type="password" placeholder="새 비밀번호 (영문+숫자 8자 이상)"
                 class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
             </div>
+            <input id="acc-recovery-pin" type="password" autocomplete="off"
+              placeholder="계정 복구 보안코드 설정/변경 (4~20자, 선택)"
+              class="w-full min-h-[40px] px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white" />
+            <p id="acc-recovery-status" class="text-[11px] text-slate-500"></p>
           </div>
 
           <button onclick="submitProfileUpdate()"
@@ -1866,32 +1887,69 @@
     }
 
     // =========================================================================
-    // [회원 인증 · 자동 로그인 · 로그아웃 · 사용자별 데이터 분리/복원 처리]
+    // [보안 유틸리티 · HttpOnly 쿠키 기반 인증 · 사용자별 데이터 분리/복원 처리]
     // =========================================================================
-    async function tryAutoLoginOnStartup() {
-      const autoLoginFlag = localStorage.getItem("skinlogic_auto_login") === "true";
-      const savedTok = autoLoginFlag
-        ? localStorage.getItem("skinlogic_auth_token")
-        : sessionStorage.getItem("skinlogic_auth_token");
+    const IS_SAME_ORIGIN_API = (API_BASE === "");
 
-      if (!savedTok) {
-        updateAuthHeaderUI();
-        return;
+    function escapeHtml(val) {
+      return String(val ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function buildAuthFetchOptions(extra = {}) {
+      const headers = { ...(extra.headers || {}) };
+      if (!IS_SAME_ORIGIN_API && authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
       }
+      return {
+        ...extra,
+        credentials: IS_SAME_ORIGIN_API ? "same-origin" : "include",
+        headers
+      };
+    }
+
+    function clearClientLegacyTokens() {
+      localStorage.removeItem("skinlogic_auth_token");
+      localStorage.removeItem("skinlogic_auto_login");
+      sessionStorage.removeItem("skinlogic_auth_token");
+    }
+
+    async function tryAutoLoginOnStartup() {
+      // 이전 버전에서 localStorage/sessionStorage에 남아있던 레거시 토큰이 있으면 1회 쿠키 승격 후 즉시 삭제
+      const legacyTok =
+        localStorage.getItem("skinlogic_auth_token") ||
+        sessionStorage.getItem("skinlogic_auth_token") ||
+        "";
+
+      const headers = {};
+      if (legacyTok) {
+        headers["Authorization"] = `Bearer ${legacyTok}`;
+      }
+
       try {
         const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
-          headers: { "Authorization": `Bearer ${savedTok}` }
+          credentials: IS_SAME_ORIGIN_API ? "same-origin" : "include",
+          headers
         });
         if (res.ok) {
           const data = await res.json();
-          authToken = savedTok;
           currentUser = data.user;
+          if (IS_SAME_ORIGIN_API) {
+            // 동일 오리진에서는 HttpOnly 쿠키로만 세션을 유지하여 XSS 토큰 탈취 차단
+            authToken = null;
+            clearClientLegacyTokens();
+          } else if (legacyTok) {
+            authToken = legacyTok;
+          }
           applyUserStateFromServer(data.state);
           updateAuthHeaderUI();
         } else {
-          localStorage.removeItem("skinlogic_auth_token");
-          localStorage.removeItem("skinlogic_auto_login");
-          sessionStorage.removeItem("skinlogic_auth_token");
+          authToken = null;
+          clearClientLegacyTokens();
           resetToCleanGuestState();
           updateAuthHeaderUI();
         }
@@ -1940,7 +1998,7 @@
 
     async function syncUserStateToServer() {
       renderHomeDashboard();
-      if (!authToken || !currentUser) return;
+      if (!currentUser) return;
 
       const payload = {
         selected_region: currentRegionKey,
@@ -1967,14 +2025,11 @@
       };
 
       try {
-        await fetch(`${API_BASE}/api/v1/user/state`, {
+        await fetch(`${API_BASE}/api/v1/user/state`, buildAuthFetchOptions({
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${authToken}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
-        });
+        }));
       } catch (e) { }
     }
 
@@ -1985,21 +2040,18 @@
     }
 
     async function handleLogout() {
-      if (authToken && currentUser) {
+      if (currentUser) {
         await syncUserStateToServer();
         try {
-          await fetch(`${API_BASE}/api/v1/auth/logout`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${authToken}` }
-          });
+          await fetch(`${API_BASE}/api/v1/auth/logout`, buildAuthFetchOptions({
+            method: "POST"
+          }));
         } catch (e) { }
       }
       const prevNick = currentUser ? currentUser.nickname : "";
       authToken = null;
       currentUser = null;
-      localStorage.removeItem("skinlogic_auth_token");
-      localStorage.removeItem("skinlogic_auto_login");
-      sessionStorage.removeItem("skinlogic_auth_token");
+      clearClientLegacyTokens();
 
       resetToCleanGuestState();
       renderAllViews();
@@ -2121,8 +2173,8 @@
     async function checkUsernameDuplicate() {
       const uname = document.getElementById("signup-username").value.trim();
       const msgEl = document.getElementById("signup-id-check-msg");
-      if (uname.length < 3) {
-        msgEl.textContent = "아이디는 3자 이상 입력해 주세요.";
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(uname)) {
+        msgEl.textContent = "아이디는 영문, 숫자, 밑줄(_) 조합 3~20자로 입력해 주세요.";
         msgEl.className = "text-[11px] text-rose-600 font-bold mt-1";
         return;
       }
@@ -2144,13 +2196,25 @@
       }
     }
 
+    function validateClientPasswordRule(pw) {
+      if (!pw || pw.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
+      if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return "비밀번호는 영문과 숫자를 모두 포함해야 합니다.";
+      return null;
+    }
+
     function checkSignupPwMatch() {
       const pw1 = document.getElementById("signup-password").value;
       const pw2 = document.getElementById("signup-password-confirm").value;
       const msgEl = document.getElementById("signup-pw-match-msg");
+      const pwRuleErr = validateClientPasswordRule(pw1);
+      if (pw1 && pwRuleErr) {
+        msgEl.textContent = `✕ ${pwRuleErr}`;
+        msgEl.className = "text-[11px] text-amber-600 font-bold -mt-1";
+        return;
+      }
       if (!pw2) { msgEl.textContent = ""; return; }
       if (pw1 === pw2) {
-        msgEl.textContent = "✓ 비밀번호가 일치합니다.";
+        msgEl.textContent = "✓ 안전한 비밀번호 형식이며 일치합니다.";
         msgEl.className = "text-[11px] text-emerald-700 font-bold -mt-1";
       } else {
         msgEl.textContent = "✕ 비밀번호가 일치하지 않습니다.";
@@ -2162,6 +2226,7 @@
       const uname = document.getElementById("signup-username").value.trim();
       const pw1 = document.getElementById("signup-password").value;
       const pw2 = document.getElementById("signup-password-confirm").value;
+      const recPin = document.getElementById("signup-recovery-pin").value.trim();
       const nick = document.getElementById("signup-nickname").value.trim();
       const fileInp = document.getElementById("signup-profile-file");
       const btn = document.getElementById("btn-submit-signup");
@@ -2170,22 +2235,32 @@
         showAuthAlert("먼저 [중복 확인] 버튼을 눌러주세요.", true);
         return;
       }
-      if (pw1.length < 4) {
-        showAuthAlert("비밀번호는 4자 이상이어야 합니다.", true);
+      const pwErr = validateClientPasswordRule(pw1);
+      if (pwErr) {
+        showAuthAlert(pwErr, true);
         return;
       }
       if (pw1 !== pw2) {
         showAuthAlert("비밀번호가 일치하지 않습니다.", true);
         return;
       }
+      if (recPin.length < 4 || recPin.length > 20) {
+        showAuthAlert("계정 복구 보안코드는 4~20자로 입력해 주세요.", true);
+        return;
+      }
       if (!nick) {
         showAuthAlert("닉네임을 입력해 주세요.", true);
+        return;
+      }
+      if (fileInp.files[0] && fileInp.files[0].size > 2 * 1024 * 1024) {
+        showAuthAlert("프로필 사진은 2MB 이하의 JPG/PNG/WEBP 파일만 업로드할 수 있습니다.", true);
         return;
       }
 
       const fd = new FormData();
       fd.append("username", uname);
       fd.append("password", pw1);
+      fd.append("recovery_pin", recPin);
       fd.append("nickname", nick);
       if (fileInp.files[0]) fd.append("profile_file", fileInp.files[0]);
 
@@ -2193,20 +2268,29 @@
       btn.textContent = "회원가입 처리 중...";
 
       try {
-        const res = await fetch(`${API_BASE}/api/v1/auth/signup`, { method: "POST", body: fd });
+        const res = await fetch(`${API_BASE}/api/v1/auth/signup`, {
+          method: "POST",
+          credentials: IS_SAME_ORIGIN_API ? "same-origin" : "include",
+          body: fd
+        });
         const data = await res.json();
         if (!res.ok || data.status === "error") {
           showAuthAlert(data.message || "회원가입 실패", true);
           return;
         }
-        authToken = data.token;
         currentUser = data.user;
-        localStorage.setItem("skinlogic_auth_token", authToken);
-        localStorage.setItem("skinlogic_auto_login", "true");
+        if (IS_SAME_ORIGIN_API) {
+          authToken = null;
+          clearClientLegacyTokens();
+        } else {
+          authToken = data.token;
+          localStorage.setItem("skinlogic_auth_token", authToken);
+          localStorage.setItem("skinlogic_auto_login", "true");
+        }
         applyUserStateFromServer(data.state);
         updateAuthHeaderUI();
         closeAuthModal();
-        showGlobalToast(`${data.user.nickname}님 가입을 환영합니다! 회원 전용 데이터 공간이 생성되었습니다.`, "teal");
+        showGlobalToast(`${data.user.nickname}님 가입을 환영합니다! 보안 강화된 회원 전용 공간이 생성되었습니다.`, "teal");
       } catch (e) {
         showAuthAlert("서버와 통신할 수 없습니다.", true);
       } finally {
@@ -2232,6 +2316,7 @@
       try {
         const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
           method: "POST",
+          credentials: IS_SAME_ORIGIN_API ? "same-origin" : "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: uname, password: pw, remember_me: remember })
         });
@@ -2240,16 +2325,21 @@
           showAuthAlert(data.message || "로그인에 실패했습니다.", true);
           return;
         }
-        authToken = data.token;
         currentUser = data.user;
-        if (remember) {
-          localStorage.setItem("skinlogic_auth_token", authToken);
-          localStorage.setItem("skinlogic_auto_login", "true");
-          sessionStorage.removeItem("skinlogic_auth_token");
+        if (IS_SAME_ORIGIN_API) {
+          authToken = null;
+          clearClientLegacyTokens();
         } else {
-          localStorage.removeItem("skinlogic_auth_token");
-          localStorage.setItem("skinlogic_auto_login", "false");
-          sessionStorage.setItem("skinlogic_auth_token", authToken);
+          authToken = data.token;
+          if (remember) {
+            localStorage.setItem("skinlogic_auth_token", authToken);
+            localStorage.setItem("skinlogic_auto_login", "true");
+            sessionStorage.removeItem("skinlogic_auth_token");
+          } else {
+            localStorage.removeItem("skinlogic_auth_token");
+            localStorage.setItem("skinlogic_auto_login", "false");
+            sessionStorage.setItem("skinlogic_auth_token", authToken);
+          }
         }
         applyUserStateFromServer(data.state);
         if (data.state && data.state.selected_region) {
@@ -2283,12 +2373,28 @@
     async function submitResetPassword() {
       const uname = document.getElementById("reset-pw-username").value.trim();
       const nick = document.getElementById("reset-pw-nickname").value.trim();
+      const recPin = document.getElementById("reset-pw-recovery-pin").value.trim();
       const newPw = document.getElementById("reset-pw-new").value;
+      if (!uname || !nick || !recPin) {
+        showAuthAlert("아이디, 닉네임, 계정 복구 보안코드를 모두 입력해 주세요.", true);
+        return;
+      }
+      const pwErr = validateClientPasswordRule(newPw);
+      if (pwErr) {
+        showAuthAlert(pwErr, true);
+        return;
+      }
       try {
         const res = await fetch(`${API_BASE}/api/v1/auth/find-account`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "RESET_PW", username: uname, nickname: nick, new_password: newPw })
+          body: JSON.stringify({
+            mode: "RESET_PW",
+            username: uname,
+            nickname: nick,
+            recovery_pin: recPin,
+            new_password: newPw
+          })
         });
         const data = await res.json();
         showAuthAlert(data.message, !res.ok);
@@ -2304,6 +2410,14 @@
       document.getElementById("acc-nickname-input").value = currentUser.nickname;
       document.getElementById("acc-current-pw").value = "";
       document.getElementById("acc-new-pw").value = "";
+      const recPinInp = document.getElementById("acc-recovery-pin");
+      if (recPinInp) recPinInp.value = "";
+      const recStatusEl = document.getElementById("acc-recovery-status");
+      if (recStatusEl) {
+        recStatusEl.textContent = currentUser.has_recovery_pin
+          ? "✓ 복구 보안코드가 안전하게 암호화 등록되어 있습니다. (변경 시 현재 비밀번호 입력)"
+          : "⚠️ 복구 보안코드 미등록 계정입니다. 비밀번호 분실 대비를 위해 위 칸에서 설정해 주세요.";
+      }
       document.getElementById("delete-confirm-pw").value = "";
 
       const summaryBadges = document.getElementById("acc-data-summary-badges");
@@ -2311,7 +2425,7 @@
         summaryBadges.innerHTML = `
           <span class="px-2 py-0.5 rounded bg-teal-50 text-teal-800 font-bold">화장대 ${vanityBasket.length}종</span>
           <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">영양제 ${selectedSupplements.length}종</span>
-          <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 font-bold">피부유형 ${selectedSkinType}</span>
+          <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 font-bold">피부유형 ${escapeHtml(selectedSkinType)}</span>
           <span class="px-2 py-0.5 rounded bg-slate-200/80 text-slate-700 font-bold">리포트 ${archiveList.length}건</span>
         `;
       }
@@ -2349,20 +2463,34 @@
       const nick = document.getElementById("acc-nickname-input").value.trim();
       const curPw = document.getElementById("acc-current-pw").value;
       const newPw = document.getElementById("acc-new-pw").value;
+      const recPin = (document.getElementById("acc-recovery-pin")?.value || "").trim();
       const fileInp = document.getElementById("acc-profile-file");
+
+      if (newPw) {
+        const pwErr = validateClientPasswordRule(newPw);
+        if (pwErr) { showAccountAlert(pwErr, true); return; }
+      }
+      if (recPin && (recPin.length < 4 || recPin.length > 20)) {
+        showAccountAlert("복구 보안코드는 4~20자로 입력해 주세요.", true);
+        return;
+      }
+      if (fileInp.files[0] && fileInp.files[0].size > 2 * 1024 * 1024) {
+        showAccountAlert("프로필 사진은 2MB 이하의 JPG/PNG/WEBP 파일만 업로드할 수 있습니다.", true);
+        return;
+      }
 
       const fd = new FormData();
       if (nick) fd.append("nickname", nick);
       if (curPw) fd.append("current_password", curPw);
       if (newPw) fd.append("new_password", newPw);
+      if (recPin) fd.append("recovery_pin", recPin);
       if (fileInp.files[0]) fd.append("profile_file", fileInp.files[0]);
 
       try {
-        const res = await fetch(`${API_BASE}/api/v1/auth/profile`, {
+        const res = await fetch(`${API_BASE}/api/v1/auth/profile`, buildAuthFetchOptions({
           method: "PUT",
-          headers: { "Authorization": `Bearer ${authToken}` },
           body: fd
-        });
+        }));
         const data = await res.json();
         if (!res.ok || data.status === "error") {
           showAccountAlert(data.message || "수정 실패", true);
@@ -2384,11 +2512,11 @@
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/api/v1/auth/account`, {
+        const res = await fetch(`${API_BASE}/api/v1/auth/account`, buildAuthFetchOptions({
           method: "DELETE",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password: pw })
-        });
+        }));
         const data = await res.json();
         if (!res.ok || data.status === "error") {
           showAccountAlert(data.message || "탈퇴 실패", true);
@@ -2398,9 +2526,7 @@
         closeAccountModal();
         authToken = null;
         currentUser = null;
-        localStorage.removeItem("skinlogic_auth_token");
-        localStorage.removeItem("skinlogic_auto_login");
-        sessionStorage.removeItem("skinlogic_auth_token");
+        clearClientLegacyTokens();
         resetToCleanGuestState();
         renderAllViews();
       } catch (e) {
@@ -3139,7 +3265,7 @@
           matchBanner.className = "p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs leading-relaxed";
           const serverHint = (res.status === 502 || res.status === 503 || res.status === 504)
             ? "서버 처리 시간이 초과되었거나 이미지가 큽니다. 위의 <b>[✂️ 영역 다시 자르기]</b>로 전성분 글씨만 더 좁게 맞춰 다시 시도해 주세요."
-            : (data.message || "OCR 분석 중 서버 오류가 발생했습니다. 영역을 다시 자르거나 수동으로 입력해 주세요.");
+            : escapeHtml(data.message || "OCR 분석 중 서버 오류가 발생했습니다. 영역을 다시 자르거나 수동으로 입력해 주세요.");
           matchBanner.innerHTML = `<b>⚠️ OCR 처리 지연/오류:</b> ${serverHint}`;
           badge.textContent = "영역을 더 좁게 자르거나 잠시 후 다시 시도해 주세요.";
           return;
@@ -3152,7 +3278,7 @@
 
           matchBanner.classList.remove("hidden");
           matchBanner.className = "p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed";
-          matchBanner.innerHTML = `<b>⚠️ 전성분 인식 안내:</b> ${data.message || "선택한 영역에서 글씨를 충분히 읽지 못했습니다."} 위의 <b>[✂️ 영역 다시 자르기]</b>로 전성분 부분만 더 좁고 똑바로 맞춰 재시도하거나, 아래에 직접 입력해 주세요.`;
+          matchBanner.innerHTML = `<b>⚠️ 전성분 인식 안내:</b> ${escapeHtml(data.message || "선택한 영역에서 글씨를 충분히 읽지 못했습니다.")} 위의 <b>[✂️ 영역 다시 자르기]</b>로 전성분 부분만 더 좁고 똑바로 맞춰 재시도하거나, 아래에 직접 입력해 주세요.`;
 
           badge.textContent = "전성분이 잘 보이도록 [✂️ 영역 다시 자르기]를 시도하거나 수동으로 입력해 주세요.";
           return;
@@ -3187,7 +3313,7 @@
 
           matchBanner.classList.remove("hidden");
           matchBanner.className = "p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs leading-relaxed";
-          matchBanner.innerHTML = `<b>✓ 기존 DB 매칭 완료:</b> DB에 등록된 <b>[${prod.brand}] ${prod.name}</b> 제품과 일치하여 전성분 및 제형 정보를 자동으로 불러왔습니다. 확인 후 아래 등록 버튼을 눌러주세요.`;
+          matchBanner.innerHTML = `<b>✓ 기존 DB 매칭 완료:</b> DB에 등록된 <b>[${escapeHtml(prod.brand)}] ${escapeHtml(prod.name)}</b> 제품과 일치하여 전성분 및 제형 정보를 자동으로 불러왔습니다. 확인 후 아래 등록 버튼을 눌러주세요.`;
         } else {
           modeBadge.className = "px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold";
           modeBadge.textContent = `✨ 전성분 ${(data.raw_ingredients || []).length}종 추출 완료`;
@@ -3285,9 +3411,9 @@
         dbResultBox.classList.remove("hidden");
         dbResultBox.innerHTML = `
           <div class="space-y-1">
-            <div><b>✓ ${actionLabel}:</b> [${prod.brand}] ${prod.name} (${prod.item_type})</div>
-            <div class="text-emerald-700"><b>주요 성분:</b> ${extracted.join(", ")}</div>
-            <div class="text-[11px] text-slate-600">• 분석 목록: ${scanAddedResult} / • 화장대: ${vanityStatusMsg}</div>
+            <div><b>✓ ${escapeHtml(actionLabel)}:</b> [${escapeHtml(prod.brand)}] ${escapeHtml(prod.name)} (${escapeHtml(prod.item_type)})</div>
+            <div class="text-emerald-700"><b>주요 성분:</b> ${escapeHtml(extracted.join(", "))}</div>
+            <div class="text-[11px] text-slate-600">• 분석 목록: ${escapeHtml(scanAddedResult)} / • 화장대: ${escapeHtml(vanityStatusMsg)}</div>
           </div>`;
 
         badge.textContent = `[${prod.brand}] ${prod.name} 등록 완료`;

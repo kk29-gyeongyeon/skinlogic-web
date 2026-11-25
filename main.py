@@ -11,6 +11,7 @@ SkinLogic - Main FastAPI Application (v3.2.1: Deployment-Ready Single Server & A
 4. 기존 6대 피부 유형 AI 루틴, 이너뷰티 1~4개 우선순위 추천, 다중 상극 분석, 회원 인증 및 더미 데이터 자동 제거 유지.
 """
 import os
+import io
 import re
 import ssl
 import time
@@ -21,19 +22,26 @@ import pickle
 import shutil
 import hashlib
 import secrets
+import threading
 import traceback
-from datetime import datetime
-from collections import Counter
+from datetime import datetime, timedelta
+from collections import Counter, defaultdict
 from itertools import combinations
 from typing import List, Optional, Dict, Any, Tuple
 
 import numpy as np
-from fastapi import FastAPI, Query, UploadFile, File, Form, Header
+from fastapi import FastAPI, Query, UploadFile, File, Form, Header, Request, Response
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+try:
+    from PIL import Image as PILImage, ImageOps as PILImageOps
+    HAS_PIL_PROFILE = True
+except ImportError:
+    HAS_PIL_PROFILE = False
 
 from ingredient_mapper import (
     extract_standard_ingredients,
@@ -74,22 +82,53 @@ DUMMY_TEST_NAMES = {"샘플A", "샘플B", "샘플C", "샘플D", "샘플 A", "샘
 app = FastAPI(
     title="SkinLogic Core API",
     description="Unified Skin-Type, Multi-Product Conflict, Dynamic Inner Beauty & AI Routine Engine",
-    version="3.2.1"
+    version="3.2.2"
 )
 
+# 보안 CORS 설정: 임의 외부 사이트 차단, Railway 배포 도메인·로컬 개발·환경변수(ALLOWED_ORIGINS)만 허용
+_env_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_default_origins = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(dict.fromkeys(_default_origins + _env_origins)),
+    allow_origin_regex=r"^https://([a-zA-Z0-9\-]+\.up\.railway\.app|[a-zA-Z0-9\-]+\.trycloudflare\.com)$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self)"
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if request.url.scheme == "https" or forwarded_proto == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 os.makedirs("static/images/cosmetics", exist_ok=True)
 os.makedirs("static/images/supplements", exist_ok=True)
 os.makedirs("static/images/profiles", exist_ok=True)
 os.makedirs("uploads", exist_ok=True)
+
+# Railway 영구 볼륨(/app/data)이 있으면 프로필 사진도 영구 볼륨에 보관하여 재배포 유실 방지
+PROFILES_STORAGE_DIR = (
+    os.path.join(VOLUME_DIR, "profiles")
+    if os.path.isdir(VOLUME_DIR)
+    else os.path.join(BASE_DIR, "static", "images", "profiles")
+)
+os.makedirs(PROFILES_STORAGE_DIR, exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/media/profiles", StaticFiles(directory=PROFILES_STORAGE_DIR), name="media_profiles")
 
 
 # ==============================================================================
@@ -535,17 +574,301 @@ def get_env_uv(lat: float = 37.2636, lon: float = 127.0286):
 
 
 # ==============================================================================
-# [1] 회원(users) 및 회원별 개인화 데이터(user_states) 테이블 & 보안 인증
+# [1] 회원(users) 및 회원별 개인화 데이터(user_states) 테이블 & 보안 인증 (v2 Hardened)
 # ==============================================================================
+PBKDF2_ITERATIONS = 310_000
+SESSION_COOKIE_NAME = "skinlogic_session"
+SESSION_TTL_REMEMBER_SEC = 7 * 24 * 3600   # 자동 로그인: 7일
+SESSION_TTL_SHORT_SEC = 24 * 3600          # 일반 로그인: 24시간
+MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024  # 프로필 이미지 최대 2MB
+ALLOWED_PROFILE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+RE_VALID_USERNAME = re.compile(r"^[a-zA-Z0-9_]{3,20}$")
+
+# 메모리 기반 슬라이딩 윈도우 레이트 리미터 (Brute-Force / 열거 공격 방어)
+_RATE_LIMIT_LOCK = threading.Lock()
+_AUTH_RATE_BUCKETS: Dict[str, List[float]] = defaultdict(list)
+
+def get_client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        first_ip = xff.split(",")[0].strip()
+        if first_ip:
+            return first_ip
+    return request.client.host if request.client else "unknown"
+
+def check_rate_limit(bucket_key: str, max_hits: int, window_sec: int, record_hit: bool = True) -> Tuple[bool, int]:
+    """슬라이딩 윈도우 내 요청 횟수 검사. 초과 시 (False, 남은 대기 초) 반환."""
+    now = time.time()
+    cutoff = now - window_sec
+    with _RATE_LIMIT_LOCK:
+        hits = [ts for ts in _AUTH_RATE_BUCKETS[bucket_key] if ts > cutoff]
+        if len(hits) >= max_hits:
+            _AUTH_RATE_BUCKETS[bucket_key] = hits
+            retry_after = max(1, int(hits[0] + window_sec - now))
+            return False, retry_after
+        if record_hit:
+            hits.append(now)
+        _AUTH_RATE_BUCKETS[bucket_key] = hits
+        return True, 0
+
+def record_rate_hit(bucket_key: str, window_sec: int) -> None:
+    now = time.time()
+    cutoff = now - window_sec
+    with _RATE_LIMIT_LOCK:
+        hits = [ts for ts in _AUTH_RATE_BUCKETS[bucket_key] if ts > cutoff]
+        hits.append(now)
+        _AUTH_RATE_BUCKETS[bucket_key] = hits
+
+def clear_rate_bucket(bucket_key: str) -> None:
+    with _RATE_LIMIT_LOCK:
+        _AUTH_RATE_BUCKETS.pop(bucket_key, None)
+
 def hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
+    """OWASP 권장 PBKDF2-HMAC-SHA256 (310,000회 반복) 기반 비밀번호/복구코드 해싱"""
     if not salt:
         salt = secrets.token_hex(16)
-    pw_hash = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
-    return pw_hash, salt
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        PBKDF2_ITERATIONS
+    ).hex()
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${dk}", salt
 
-def verify_password(password: str, stored_hash: str, salt: str) -> bool:
-    calc_hash, _ = hash_password(password, salt)
-    return secrets.compare_digest(calc_hash, stored_hash)
+def verify_password(password: str, stored_hash: str, salt: str) -> Tuple[bool, bool]:
+    """
+    비밀번호 검증 후 (일치 여부, PBKDF2 재해싱 필요 여부) 반환.
+    기존 SHA-256 계정도 무중단 호환되며 로그인 성공 시 자동으로 PBKDF2로 업그레이드됩니다.
+    """
+    if not stored_hash or not salt:
+        return False, False
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        parts = stored_hash.split("$")
+        if len(parts) != 3:
+            return False, False
+        try:
+            iters = int(parts[1])
+        except ValueError:
+            return False, False
+        calc_dk = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt.encode("utf-8"),
+            iters
+        ).hex()
+        is_ok = secrets.compare_digest(calc_dk, parts[2])
+        return is_ok, (is_ok and iters < PBKDF2_ITERATIONS)
+    # 레거시 단일 SHA-256 호환 검증
+    legacy_hash = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    is_ok = secrets.compare_digest(legacy_hash, stored_hash)
+    return is_ok, is_ok
+
+def run_dummy_password_work() -> None:
+    """존재하지 않는 아이디 로그인 시에도 동일한 연산 시간을 소요시켜 타이밍 공격 차단"""
+    hashlib.pbkdf2_hmac("sha256", b"dummy_password", b"dummy_salt_value", PBKDF2_ITERATIONS)
+
+def validate_username(uname: str) -> Optional[str]:
+    if not RE_VALID_USERNAME.fullmatch(uname or ""):
+        return "아이디는 영문, 숫자, 밑줄(_) 조합 3~20자로 입력해 주세요."
+    return None
+
+def validate_new_password(password: str) -> Optional[str]:
+    if not password or len(password) < 8:
+        return "비밀번호는 8자 이상이어야 합니다."
+    if len(password) > 128:
+        return "비밀번호는 128자 이하로 입력해 주세요."
+    if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        return "비밀번호는 영문과 숫자를 모두 포함해야 합니다."
+    return None
+
+def validate_recovery_pin(pin: str) -> Optional[str]:
+    p = (pin or "").strip()
+    if len(p) < 4 or len(p) > 20:
+        return "계정 복구 보안코드는 4~20자로 입력해 주세요."
+    return None
+
+def mask_username(uname: str) -> str:
+    if not uname:
+        return ""
+    if len(uname) <= 2:
+        return uname[0] + "*"
+    if len(uname) <= 4:
+        return uname[:2] + "*" * (len(uname) - 2)
+    return uname[:3] + "*" * (len(uname) - 3)
+
+def hash_session_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+def is_https_request(request: Request) -> bool:
+    return (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto", "").lower() == "https"
+    )
+
+def set_session_cookie(response: Response, request: Request, raw_token: str, remember_me: bool = True) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=raw_token,
+        httponly=True,
+        samesite="lax",
+        secure=is_https_request(request),
+        path="/",
+        max_age=SESSION_TTL_REMEMBER_SEC if remember_me else None
+    )
+
+def clear_session_cookie(response: Response, request: Request) -> None:
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=is_https_request(request)
+    )
+
+def create_user_session(conn: sqlite3.Connection, user_id: int, remember_me: bool = True) -> str:
+    raw_token = secrets.token_urlsafe(32)
+    tok_hash = hash_session_token(raw_token)
+    now_dt = datetime.now()
+    ttl = SESSION_TTL_REMEMBER_SEC if remember_me else SESSION_TTL_SHORT_SEC
+    exp_dt = now_dt + timedelta(seconds=ttl)
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+    exp_str = exp_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    cur = conn.cursor()
+    cur.execute("DELETE FROM user_sessions WHERE user_id = ? AND expires_at <= ?", (user_id, now_str))
+    cur.execute("""
+        INSERT INTO user_sessions (user_id, token_hash, expires_at, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, tok_hash, exp_str, now_str))
+    # 평문 토큰이 users 테이블에 남지 않도록 비움
+    cur.execute("UPDATE users SET session_token = '' WHERE user_id = ?", (user_id,))
+    return raw_token
+
+def extract_request_token(request: Request, authorization: Optional[str]) -> str:
+    cookie_tok = (request.cookies.get(SESSION_COOKIE_NAME) or "").strip()
+    if cookie_tok:
+        return cookie_tok
+    if authorization:
+        return authorization.replace("Bearer ", "").strip()
+    return ""
+
+def get_user_by_request(
+    conn: sqlite3.Connection,
+    request: Request,
+    authorization: Optional[str]
+) -> Tuple[Optional[sqlite3.Row], str, bool]:
+    """
+    HttpOnly 쿠키 또는 Authorization Bearer 헤더로 회원 조회.
+    반환: (user_row, raw_token, legacy_token_migrated)
+    """
+    raw_tok = extract_request_token(request, authorization)
+    if not raw_tok:
+        return None, "", False
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tok_hash = hash_session_token(raw_tok)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT u.*
+        FROM user_sessions s
+        JOIN users u ON u.user_id = s.user_id
+        WHERE s.token_hash = ? AND s.expires_at > ?
+        LIMIT 1
+    """, (tok_hash, now_str))
+    row = cur.fetchone()
+    if row:
+        return row, raw_tok, False
+
+    # 기존에 발급되어 있던 레거시 users.session_token 무중단 1회 마이그레이션
+    cur.execute("SELECT * FROM users WHERE session_token = ? AND session_token != '' LIMIT 1", (raw_tok,))
+    legacy_user = cur.fetchone()
+    if legacy_user:
+        exp_str = (datetime.now() + timedelta(seconds=SESSION_TTL_REMEMBER_SEC)).strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("""
+            INSERT OR IGNORE INTO user_sessions (user_id, token_hash, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (legacy_user["user_id"], tok_hash, exp_str, now_str))
+        cur.execute("UPDATE users SET session_token = '' WHERE user_id = ?", (legacy_user["user_id"],))
+        conn.commit()
+        return legacy_user, raw_tok, True
+
+    return None, "", False
+
+async def save_validated_profile_image(profile_file: UploadFile) -> Tuple[Optional[str], Optional[str]]:
+    """
+    프로필 사진 보안 검증 및 안전 저장:
+    - 허용 확장자(.jpg/.jpeg/.png/.webp) 화이트리스트 검사 (.svg/.html 등 XSS 파일 원천 차단)
+    - 최대 2MB 용량 제한
+    - Pillow 실제 이미지 디코딩 + EXIF 제거 + 512px 리사이즈 후 재인코딩 저장
+    - 파일명은 사용자 입력을 배제한 무작위 토큰 사용 (경로 조작 방지)
+    반환: (저장된 URL 경로, 에러 메시지)
+    """
+    orig_name = os.path.basename(profile_file.filename or "")
+    ext = os.path.splitext(orig_name)[1].lower()
+    if ext not in ALLOWED_PROFILE_EXTS:
+        return None, "프로필 사진은 JPG, PNG, WEBP 이미지 파일만 업로드할 수 있습니다."
+
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = await profile_file.read(64 * 1024)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_PROFILE_IMAGE_BYTES:
+            return None, "프로필 사진은 최대 2MB 이하만 업로드할 수 있습니다."
+        chunks.append(chunk)
+    raw_bytes = b"".join(chunks)
+    if not raw_bytes:
+        return None, "빈 이미지 파일은 업로드할 수 없습니다."
+
+    if HAS_PIL_PROFILE:
+        try:
+            img = PILImage.open(io.BytesIO(raw_bytes))
+            img.verify()
+            img = PILImage.open(io.BytesIO(raw_bytes))
+            img = PILImageOps.exif_transpose(img)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            img.thumbnail((512, 512), PILImage.Resampling.LANCZOS)
+            out_buf = io.BytesIO()
+            if img.mode == "RGBA":
+                fname = f"avatar_{secrets.token_hex(12)}.png"
+                img.save(out_buf, format="PNG", optimize=True)
+            else:
+                fname = f"avatar_{secrets.token_hex(12)}.jpg"
+                img.convert("RGB").save(out_buf, format="JPEG", quality=88, optimize=True)
+            clean_bytes = out_buf.getvalue()
+        except Exception:
+            return None, "유효한 이미지 파일이 아닙니다. 정상적인 JPG/PNG/WEBP 사진을 선택해 주세요."
+    else:
+        fname = f"avatar_{secrets.token_hex(12)}{ext}"
+        clean_bytes = raw_bytes
+
+    save_path = os.path.join(PROFILES_STORAGE_DIR, fname)
+    with open(save_path, "wb") as f_out:
+        f_out.write(clean_bytes)
+    return f"/media/profiles/{fname}", None
+
+def delete_profile_image_file(profile_url: str) -> None:
+    if not profile_url:
+        return
+    try:
+        if profile_url.startswith("/media/profiles/"):
+            fname = os.path.basename(profile_url)
+            target = os.path.realpath(os.path.join(PROFILES_STORAGE_DIR, fname))
+            base = os.path.realpath(PROFILES_STORAGE_DIR)
+        elif profile_url.startswith("/static/images/profiles/"):
+            fname = os.path.basename(profile_url)
+            legacy_dir = os.path.join(BASE_DIR, "static", "images", "profiles")
+            target = os.path.realpath(os.path.join(legacy_dir, fname))
+            base = os.path.realpath(legacy_dir)
+        else:
+            return
+        if target.startswith(base + os.sep) and os.path.isfile(target):
+            os.remove(target)
+    except Exception:
+        pass
 
 DEFAULT_USER_STATE = {
     "selected_region": "수원",
@@ -603,9 +926,32 @@ def init_user_tables():
             nickname TEXT NOT NULL,
             profile_image TEXT DEFAULT '',
             session_token TEXT DEFAULT '',
+            recovery_hash TEXT DEFAULT '',
+            recovery_salt TEXT DEFAULT '',
             created_at TEXT NOT NULL
         )
     """)
+    # 기존 DB 무중단 컬럼 마이그레이션 (이미 있으면 스킵)
+    cur.execute("PRAGMA table_info(users)")
+    existing_cols = {row[1] for row in cur.fetchall()}
+    if "recovery_hash" not in existing_cols:
+        cur.execute("ALTER TABLE users ADD COLUMN recovery_hash TEXT DEFAULT ''")
+    if "recovery_salt" not in existing_cols:
+        cur.execute("ALTER TABLE users ADD COLUMN recovery_salt TEXT DEFAULT ''")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_exp ON user_sessions(expires_at)")
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_states (
             user_id INTEGER PRIMARY KEY,
@@ -630,16 +976,6 @@ def on_startup():
         print(f"🤖 AI Routine Model 로드 완료 ({ai_package.get('model_name')}, 정확도: {ai_package.get('accuracy')*100:.2f}%)")
     else:
         print("⚠️ 'routine_model.pkl'을 찾을 수 없습니다. 기본 룰셋 모드로 구동됩니다.")
-
-def get_user_by_token(conn: sqlite3.Connection, token: Optional[str]) -> Optional[sqlite3.Row]:
-    if not token:
-        return None
-    clean_tok = token.replace("Bearer ", "").strip()
-    if not clean_tok:
-        return None
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE session_token = ?", (clean_tok,))
-    return cur.fetchone()
 
 def get_or_create_user_state(conn: sqlite3.Connection, user_id: int) -> Dict[str, Any]:
     cur = conn.cursor()
@@ -669,11 +1005,17 @@ def get_or_create_user_state(conn: sqlite3.Connection, user_id: int) -> Dict[str
     return fresh_state
 
 
-@app.get("/api/v1/auth/check-username", summary="회원가입 시 아이디 중복 확인")
-def check_username_duplicate(username: str = Query(..., min_length=2)):
+@app.get("/api/v1/auth/check-username", summary="회원가입 시 아이디 형식·중복 확인")
+def check_username_duplicate(request: Request, username: str = Query(..., min_length=2)):
+    client_ip = get_client_ip(request)
+    allowed, retry_sec = check_rate_limit(f"check_user:{client_ip}", max_hits=30, window_sec=60)
+    if not allowed:
+        return JSONResponse(status_code=429, content={"available": False, "message": f"요청이 너무 많습니다. {retry_sec}초 후 다시 시도해 주세요."})
+
     uname = username.strip()
-    if len(uname) < 3:
-        return {"available": False, "message": "아이디는 최소 3자 이상 입력해 주세요."}
+    uname_err = validate_username(uname)
+    if uname_err:
+        return {"available": False, "message": uname_err}
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users WHERE username = ?", (uname,))
@@ -684,21 +1026,36 @@ def check_username_duplicate(username: str = Query(..., min_length=2)):
     return {"available": True, "message": f"'{uname}'은(는) 사용 가능한 아이디입니다."}
 
 
-@app.post("/api/v1/auth/signup", summary="회원가입 (프로필 사진 업로드 및 회원별 독립 상태 생성)")
+@app.post("/api/v1/auth/signup", summary="회원가입 (PBKDF2 암호화 · 복구 보안코드 · 안전 프로필 업로드 · HttpOnly 쿠키)")
 async def signup_user(
+    request: Request,
+    response: Response,
     username: str = Form(...),
     password: str = Form(...),
     nickname: str = Form(...),
+    recovery_pin: str = Form(""),
     profile_file: Optional[UploadFile] = File(None)
 ):
+    client_ip = get_client_ip(request)
+    allowed, retry_sec = check_rate_limit(f"signup:{client_ip}", max_hits=10, window_sec=600)
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"가입 시도가 너무 많습니다. {retry_sec}초 후 다시 시도해 주세요."})
+
     uname = username.strip()
     nick = nickname.strip()
-    if len(uname) < 3:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "아이디는 3자 이상이어야 합니다."})
-    if len(password) < 4:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "비밀번호는 4자 이상이어야 합니다."})
-    if not nick:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "닉네임을 입력해 주세요."})
+    rec_pin = (recovery_pin or "").strip()
+
+    uname_err = validate_username(uname)
+    if uname_err:
+        return JSONResponse(status_code=400, content={"status": "error", "message": uname_err})
+    pw_err = validate_new_password(password)
+    if pw_err:
+        return JSONResponse(status_code=400, content={"status": "error", "message": pw_err})
+    if not nick or len(nick) > 30:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "닉네임은 1~30자로 입력해 주세요."})
+    pin_err = validate_recovery_pin(rec_pin)
+    if pin_err:
+        return JSONResponse(status_code=400, content={"status": "error", "message": pin_err})
 
     conn = get_db()
     cur = conn.cursor()
@@ -709,21 +1066,20 @@ async def signup_user(
 
     profile_url = ""
     if profile_file and profile_file.filename:
-        ext = os.path.splitext(profile_file.filename)[1] or ".png"
-        fname = f"user_{uname}_{int(time.time())}{ext}"
-        save_path = os.path.join("static/images/profiles", fname)
-        with open(save_path, "wb") as buffer:
-            shutil.copyfileobj(profile_file.file, buffer)
-        profile_url = f"/static/images/profiles/{fname}"
+        saved_url, img_err = await save_validated_profile_image(profile_file)
+        if img_err:
+            conn.close()
+            return JSONResponse(status_code=400, content={"status": "error", "message": img_err})
+        profile_url = saved_url or ""
 
     pw_hash, pw_salt = hash_password(password)
-    token = secrets.token_hex(24)
+    rec_hash, rec_salt = hash_password(rec_pin)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cur.execute("""
-        INSERT INTO users (username, password_hash, password_salt, nickname, profile_image, session_token, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (uname, pw_hash, pw_salt, nick, profile_url, token, now_str))
+        INSERT INTO users (username, password_hash, password_salt, nickname, profile_image, session_token, recovery_hash, recovery_salt, created_at)
+        VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)
+    """, (uname, pw_hash, pw_salt, nick, profile_url, rec_hash, rec_salt, now_str))
     new_uid = int(cur.lastrowid)
 
     fresh_state = json.loads(json.dumps(DEFAULT_USER_STATE))
@@ -731,18 +1087,23 @@ async def signup_user(
         INSERT INTO user_states (user_id, state_json, updated_at)
         VALUES (?, ?, ?)
     """, (new_uid, json.dumps(fresh_state, ensure_ascii=False), now_str))
+
+    raw_token = create_user_session(conn, new_uid, remember_me=True)
     conn.commit()
     conn.close()
+
+    set_session_cookie(response, request, raw_token, remember_me=True)
 
     return {
         "status": "success",
         "message": f"환영합니다, {nick}님! 회원가입이 완료되었습니다.",
-        "token": token,
+        "token": raw_token,
         "user": {
             "user_id": new_uid,
             "username": uname,
             "nickname": nick,
             "profile_image": profile_url,
+            "has_recovery_pin": True,
             "created_at": now_str
         },
         "state": fresh_state
@@ -754,41 +1115,79 @@ class LoginRequest(BaseModel):
     password: str
     remember_me: bool = True
 
-@app.post("/api/v1/auth/login", summary="아이디 로그인 및 회원별 저장 상태 복원")
-def login_user(req: LoginRequest):
+@app.post("/api/v1/auth/login", summary="아이디 로그인 (Brute-Force 방어 · PBKDF2 자동 마이그레이션 · HttpOnly 쿠키)")
+def login_user(req: LoginRequest, request: Request, response: Response):
     uname = (req.username or "").strip()
     pw = req.password or ""
     if not uname or not pw:
         return JSONResponse(status_code=400, content={"status": "error", "message": "아이디와 비밀번호를 모두 입력해 주세요."})
 
+    client_ip = get_client_ip(request)
+    pair_key = f"login_fail:{client_ip}:{uname.lower()}"
+    ip_key = f"login_ip_fail:{client_ip}"
+
+    ok_pair, retry_pair = check_rate_limit(pair_key, max_hits=5, window_sec=300, record_hit=False)
+    ok_ip, retry_ip = check_rate_limit(ip_key, max_hits=15, window_sec=300, record_hit=False)
+    if not ok_pair or not ok_ip:
+        wait_sec = max(retry_pair, retry_ip)
+        return JSONResponse(
+            status_code=429,
+            content={"status": "error", "error_code": "RATE_LIMITED", "message": f"로그인 실패 횟수가 많아 일시 제한되었습니다. {wait_sec}초 후 다시 시도해 주세요."}
+        )
+
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE username = ?", (uname,))
     user = cur.fetchone()
+
+    # 계정 열거 및 타이밍 공격 방어: 아이디 미존재 / 비밀번호 불일치 동일 응답
     if not user:
+        run_dummy_password_work()
+        record_rate_hit(pair_key, 300)
+        record_rate_hit(ip_key, 300)
         conn.close()
-        return JSONResponse(status_code=401, content={"status": "error", "error_code": "USER_NOT_FOUND", "message": "존재하지 않는 아이디입니다. 아이디를 다시 확인해 주세요."})
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "error_code": "INVALID_CREDENTIALS", "message": "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요."}
+        )
 
-    if not verify_password(pw, user["password_hash"], user["password_salt"]):
+    pw_ok, needs_rehash = verify_password(pw, user["password_hash"], user["password_salt"])
+    if not pw_ok:
+        record_rate_hit(pair_key, 300)
+        record_rate_hit(ip_key, 300)
         conn.close()
-        return JSONResponse(status_code=401, content={"status": "error", "error_code": "WRONG_PASSWORD", "message": "비밀번호가 일치하지 않습니다. 다시 입력해 주세요."})
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "error_code": "INVALID_CREDENTIALS", "message": "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요."}
+        )
 
-    token = secrets.token_hex(24)
-    cur.execute("UPDATE users SET session_token = ? WHERE user_id = ?", (token, user["user_id"]))
+    # 로그인 성공 시 실패 카운터 초기화
+    clear_rate_bucket(pair_key)
+
+    # 기존 SHA-256 계정은 로그인 시 PBKDF2로 자동 무중단 업그레이드
+    if needs_rehash:
+        new_hash, new_salt = hash_password(pw)
+        cur.execute("UPDATE users SET password_hash = ?, password_salt = ? WHERE user_id = ?", (new_hash, new_salt, user["user_id"]))
+
+    raw_token = create_user_session(conn, user["user_id"], remember_me=bool(req.remember_me))
     conn.commit()
 
     user_state = get_or_create_user_state(conn, user["user_id"])
+    has_rec = bool(user["recovery_hash"]) if "recovery_hash" in user.keys() else False
     conn.close()
+
+    set_session_cookie(response, request, raw_token, remember_me=bool(req.remember_me))
 
     return {
         "status": "success",
         "message": f"{user['nickname']}님, 환영합니다! 저장된 개인 데이터가 복원되었습니다.",
-        "token": token,
+        "token": raw_token,
         "user": {
             "user_id": user["user_id"],
             "username": user["username"],
             "nickname": user["nickname"],
             "profile_image": user["profile_image"] or "",
+            "has_recovery_pin": has_rec,
             "created_at": user["created_at"]
         },
         "state": user_state
@@ -796,14 +1195,19 @@ def login_user(req: LoginRequest):
 
 
 @app.get("/api/v1/auth/me", summary="자동 로그인 검증 및 내 프로필·저장 상태 불러오기")
-def get_current_user_session(authorization: Optional[str] = Header(None)):
+def get_current_user_session(request: Request, response: Response, authorization: Optional[str] = Header(None)):
     conn = get_db()
-    user = get_user_by_token(conn, authorization)
+    user, raw_tok, migrated = get_user_by_request(conn, request, authorization)
     if not user:
         conn.close()
         return JSONResponse(status_code=401, content={"status": "error", "message": "유효하지 않거나 만료된 로그인 세션입니다."})
 
+    # 기존 Bearer 토큰으로 접근한 동일 오리진 사용자는 HttpOnly 쿠키로 자동 승격
+    if raw_tok and (migrated or not request.cookies.get(SESSION_COOKIE_NAME)):
+        set_session_cookie(response, request, raw_tok, remember_me=True)
+
     user_state = get_or_create_user_state(conn, user["user_id"])
+    has_rec = bool(user["recovery_hash"]) if "recovery_hash" in user.keys() else False
     conn.close()
     return {
         "status": "success",
@@ -812,21 +1216,24 @@ def get_current_user_session(authorization: Optional[str] = Header(None)):
             "username": user["username"],
             "nickname": user["nickname"],
             "profile_image": user["profile_image"] or "",
+            "has_recovery_pin": has_rec,
             "created_at": user["created_at"]
         },
         "state": user_state
     }
 
 
-@app.post("/api/v1/auth/logout", summary="로그아웃 (DB의 회원 개인 데이터는 영구 보존하고 세션 토큰만 해제)")
-def logout_user(authorization: Optional[str] = Header(None)):
+@app.post("/api/v1/auth/logout", summary="로그아웃 (DB 세션 해시 즉시 폐기 및 HttpOnly 쿠키 삭제)")
+def logout_user(request: Request, response: Response, authorization: Optional[str] = Header(None)):
     conn = get_db()
-    user = get_user_by_token(conn, authorization)
-    if user:
+    user, raw_tok, _ = get_user_by_request(conn, request, authorization)
+    if user and raw_tok:
         cur = conn.cursor()
+        cur.execute("DELETE FROM user_sessions WHERE token_hash = ?", (hash_session_token(raw_tok),))
         cur.execute("UPDATE users SET session_token = '' WHERE user_id = ?", (user["user_id"],))
         conn.commit()
     conn.close()
+    clear_session_cookie(response, request)
     return {"status": "success", "message": "안전하게 로그아웃되었습니다. 회원님의 데이터는 계정에 안전하게 보관되어 있습니다."}
 
 
@@ -834,10 +1241,16 @@ class FindAccountRequest(BaseModel):
     mode: str = Field("FIND_ID", description="FIND_ID 또는 RESET_PW")
     nickname: Optional[str] = ""
     username: Optional[str] = ""
+    recovery_pin: Optional[str] = ""
     new_password: Optional[str] = ""
 
-@app.post("/api/v1/auth/find-account", summary="아이디 찾기 및 비밀번호 재설정")
-def find_or_reset_account(req: FindAccountRequest):
+@app.post("/api/v1/auth/find-account", summary="마스킹 아이디 찾기 및 복구 보안코드 기반 비밀번호 재설정")
+def find_or_reset_account(req: FindAccountRequest, request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_sec = check_rate_limit(f"find_acc:{client_ip}", max_hits=10, window_sec=600)
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"요청이 너무 많습니다. {retry_sec}초 후 다시 시도해 주세요."})
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -846,48 +1259,74 @@ def find_or_reset_account(req: FindAccountRequest):
         if not nick:
             conn.close()
             return JSONResponse(status_code=400, content={"status": "error", "message": "가입 시 설정한 닉네임을 입력해 주세요."})
-        cur.execute("SELECT username, created_at FROM users WHERE nickname = ?", (nick,))
+        cur.execute("SELECT username FROM users WHERE nickname = ?", (nick,))
         rows = cur.fetchall()
         conn.close()
         if not rows:
-            return JSONResponse(status_code=404, content={"status": "error", "message": f"닉네임 '{nick}'(으)로 등록된 계정을 찾을 수 없습니다."})
-        found_ids = [r["username"] for r in rows]
+            return JSONResponse(status_code=404, content={"status": "error", "message": "입력하신 정보와 일치하는 계정을 찾을 수 없습니다."})
+        masked_ids = [mask_username(r["username"]) for r in rows]
         return {
             "status": "success",
-            "message": f"회원님의 아이디를 찾았습니다: {', '.join(found_ids)}",
-            "found_usernames": found_ids
+            "message": f"가입된 아이디(보안 마스킹): {', '.join(masked_ids)}",
+            "found_usernames": masked_ids
         }
 
     uname = (req.username or "").strip()
     nick = (req.nickname or "").strip()
+    rec_pin = (req.recovery_pin or "").strip()
     new_pw = req.new_password or ""
-    if not uname or not nick or len(new_pw) < 4:
-        conn.close()
-        return JSONResponse(status_code=400, content={"status": "error", "message": "아이디, 닉네임 및 새 비밀번호(4자 이상)를 정확히 입력해 주세요."})
 
-    cur.execute("SELECT user_id FROM users WHERE username = ? AND nickname = ?", (uname, nick))
+    if not uname or not nick or not rec_pin:
+        conn.close()
+        return JSONResponse(status_code=400, content={"status": "error", "message": "아이디, 닉네임, 계정 복구 보안코드를 모두 입력해 주세요."})
+
+    pw_err = validate_new_password(new_pw)
+    if pw_err:
+        conn.close()
+        return JSONResponse(status_code=400, content={"status": "error", "message": pw_err})
+
+    cur.execute("SELECT user_id, recovery_hash, recovery_salt FROM users WHERE username = ? AND nickname = ?", (uname, nick))
     user = cur.fetchone()
     if not user:
+        run_dummy_password_work()
         conn.close()
-        return JSONResponse(status_code=404, content={"status": "error", "message": "아이디와 닉네임 정보가 일치하는 계정이 없습니다."})
+        return JSONResponse(status_code=400, content={"status": "error", "message": "입력하신 계정 정보 또는 복구 보안코드가 일치하지 않습니다."})
+
+    rec_hash = user["recovery_hash"] or ""
+    rec_salt = user["recovery_salt"] or ""
+    if not rec_hash or not rec_salt:
+        conn.close()
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "보안 강화로 복구 보안코드가 등록된 계정만 비밀번호 재설정이 가능합니다. 로그인 후 [계정관리]에서 복구 보안코드를 설정해 주세요."}
+        )
+
+    pin_ok, _ = verify_password(rec_pin, rec_hash, rec_salt)
+    if not pin_ok:
+        conn.close()
+        return JSONResponse(status_code=400, content={"status": "error", "message": "입력하신 계정 정보 또는 복구 보안코드가 일치하지 않습니다."})
 
     pw_hash, pw_salt = hash_password(new_pw)
-    cur.execute("UPDATE users SET password_hash = ?, password_salt = ? WHERE user_id = ?", (pw_hash, pw_salt, user["user_id"]))
+    cur.execute("UPDATE users SET password_hash = ?, password_salt = ?, session_token = '' WHERE user_id = ?", (pw_hash, pw_salt, user["user_id"]))
+    # 비밀번호 재설정 시 모든 기기의 기존 세션 강제 만료
+    cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user["user_id"],))
     conn.commit()
     conn.close()
-    return {"status": "success", "message": "비밀번호가 성공적으로 재설정되었습니다. 새 비밀번호로 로그인해 주세요."}
+    return {"status": "success", "message": "비밀번호가 안전하게 재설정되었으며 기존 로그인 세션이 만료되었습니다. 새 비밀번호로 로그인해 주세요."}
 
 
-@app.put("/api/v1/auth/profile", summary="내 프로필 수정 (닉네임·비밀번호·프로필 사진 변경)")
+@app.put("/api/v1/auth/profile", summary="내 프로필 수정 (닉네임·비밀번호·복구 보안코드·안전 프로필 사진 변경)")
 async def update_user_profile(
+    request: Request,
     authorization: Optional[str] = Header(None),
     nickname: Optional[str] = Form(None),
     current_password: Optional[str] = Form(None),
     new_password: Optional[str] = Form(None),
+    recovery_pin: Optional[str] = Form(None),
     profile_file: Optional[UploadFile] = File(None)
 ):
     conn = get_db()
-    user = get_user_by_token(conn, authorization)
+    user, raw_tok, _ = get_user_by_request(conn, request, authorization)
     if not user:
         conn.close()
         return JSONResponse(status_code=401, content={"status": "error", "message": "로그인이 필요합니다."})
@@ -895,41 +1334,76 @@ async def update_user_profile(
     cur = conn.cursor()
     uid = user["user_id"]
     updated_nick = user["nickname"]
-    updated_img = user["profile_image"] or ""
+    old_img = user["profile_image"] or ""
+    updated_img = old_img
+    new_uploaded_url = ""
+    has_rec = bool(user["recovery_hash"]) if "recovery_hash" in user.keys() else False
 
     if nickname and nickname.strip():
+        if len(nickname.strip()) > 30:
+            conn.close()
+            return JSONResponse(status_code=400, content={"status": "error", "message": "닉네임은 30자 이하로 입력해 주세요."})
         updated_nick = nickname.strip()
 
     if profile_file and profile_file.filename:
-        ext = os.path.splitext(profile_file.filename)[1] or ".png"
-        fname = f"user_{user['username']}_{int(time.time())}{ext}"
-        save_path = os.path.join("static/images/profiles", fname)
-        with open(save_path, "wb") as buffer:
-            shutil.copyfileobj(profile_file.file, buffer)
-        updated_img = f"/static/images/profiles/{fname}"
+        saved_url, img_err = await save_validated_profile_image(profile_file)
+        if img_err:
+            conn.close()
+            return JSONResponse(status_code=400, content={"status": "error", "message": img_err})
+        new_uploaded_url = saved_url or ""
+        updated_img = new_uploaded_url
 
-    if new_password and len(new_password.strip()) > 0:
-        if not current_password or not verify_password(current_password, user["password_hash"], user["password_salt"]):
+    want_pw_change = bool(new_password and len(new_password.strip()) > 0)
+    want_pin_change = bool(recovery_pin and len(recovery_pin.strip()) > 0)
+
+    if want_pw_change or want_pin_change:
+        pw_ok, _ = verify_password(current_password or "", user["password_hash"], user["password_salt"])
+        if not current_password or not pw_ok:
+            if new_uploaded_url:
+                delete_profile_image_file(new_uploaded_url)
             conn.close()
-            return JSONResponse(status_code=400, content={"status": "error", "message": "현재 비밀번호가 일치하지 않아 비밀번호를 변경할 수 없습니다."})
-        if len(new_password.strip()) < 4:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "현재 비밀번호가 일치하지 않아 보안 정보를 변경할 수 없습니다."})
+
+    if want_pw_change:
+        pw_err = validate_new_password(new_password.strip())
+        if pw_err:
+            if new_uploaded_url:
+                delete_profile_image_file(new_uploaded_url)
             conn.close()
-            return JSONResponse(status_code=400, content={"status": "error", "message": "새 비밀번호는 4자 이상이어야 합니다."})
+            return JSONResponse(status_code=400, content={"status": "error", "message": pw_err})
         pw_hash, pw_salt = hash_password(new_password.strip())
         cur.execute("UPDATE users SET password_hash = ?, password_salt = ? WHERE user_id = ?", (pw_hash, pw_salt, uid))
+        # 현재 기기를 제외한 다른 기기 세션 강제 만료
+        if raw_tok:
+            cur.execute("DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?", (uid, hash_session_token(raw_tok)))
+
+    if want_pin_change:
+        pin_err = validate_recovery_pin(recovery_pin.strip())
+        if pin_err:
+            if new_uploaded_url:
+                delete_profile_image_file(new_uploaded_url)
+            conn.close()
+            return JSONResponse(status_code=400, content={"status": "error", "message": pin_err})
+        rec_hash, rec_salt = hash_password(recovery_pin.strip())
+        cur.execute("UPDATE users SET recovery_hash = ?, recovery_salt = ? WHERE user_id = ?", (rec_hash, rec_salt, uid))
+        has_rec = True
 
     cur.execute("UPDATE users SET nickname = ?, profile_image = ? WHERE user_id = ?", (updated_nick, updated_img, uid))
     conn.commit()
     conn.close()
 
+    if new_uploaded_url and old_img and old_img != new_uploaded_url:
+        delete_profile_image_file(old_img)
+
     return {
         "status": "success",
-        "message": "회원 프로필 정보가 성공적으로 수정되었습니다.",
+        "message": "회원 프로필 및 보안 정보가 성공적으로 수정되었습니다.",
         "user": {
             "user_id": uid,
             "username": user["username"],
             "nickname": updated_nick,
             "profile_image": updated_img,
+            "has_recovery_pin": has_rec,
             "created_at": user["created_at"]
         }
     }
@@ -938,23 +1412,29 @@ async def update_user_profile(
 class DeleteAccountRequest(BaseModel):
     password: str
 
-@app.delete("/api/v1/auth/account", summary="회원 탈퇴")
-def delete_user_account(req: DeleteAccountRequest, authorization: Optional[str] = Header(None)):
+@app.delete("/api/v1/auth/account", summary="회원 탈퇴 (계정·세션·프로필 파일 완전 삭제)")
+def delete_user_account(req: DeleteAccountRequest, request: Request, response: Response, authorization: Optional[str] = Header(None)):
     conn = get_db()
-    user = get_user_by_token(conn, authorization)
+    user, _, _ = get_user_by_request(conn, request, authorization)
     if not user:
         conn.close()
         return JSONResponse(status_code=401, content={"status": "error", "message": "로그인이 필요합니다."})
 
-    if not verify_password(req.password or "", user["password_hash"], user["password_salt"]):
+    pw_ok, _ = verify_password(req.password or "", user["password_hash"], user["password_salt"])
+    if not pw_ok:
         conn.close()
         return JSONResponse(status_code=400, content={"status": "error", "message": "비밀번호가 일치하지 않아 탈퇴 처리를 진행할 수 없습니다."})
 
+    old_profile_img = user["profile_image"] or ""
     cur = conn.cursor()
+    cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user["user_id"],))
     cur.execute("DELETE FROM user_states WHERE user_id = ?", (user["user_id"],))
     cur.execute("DELETE FROM users WHERE user_id = ?", (user["user_id"],))
     conn.commit()
     conn.close()
+
+    delete_profile_image_file(old_profile_img)
+    clear_session_cookie(response, request)
     return {"status": "success", "message": "회원 탈퇴가 완료되었습니다."}
 
 
@@ -969,9 +1449,9 @@ class UserStateSaveRequest(BaseModel):
     archive_list: List[Dict[str, Any]] = Field(default_factory=list)
 
 @app.put("/api/v1/user/state", summary="회원별 작업 상태 실시간 DB 영구 저장 (user_id별 격리)")
-def save_user_state(req: UserStateSaveRequest, authorization: Optional[str] = Header(None)):
+def save_user_state(req: UserStateSaveRequest, request: Request, authorization: Optional[str] = Header(None)):
     conn = get_db()
-    user = get_user_by_token(conn, authorization)
+    user, _, _ = get_user_by_request(conn, request, authorization)
     if not user:
         conn.close()
         return JSONResponse(status_code=401, content={"status": "error", "message": "로그인이 필요합니다."})
